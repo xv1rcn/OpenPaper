@@ -5,13 +5,25 @@ from urllib.parse import unquote, urlsplit
 
 def public_file(paths, url):
     relative = unquote(urlsplit(url).path).lstrip("/") or "index.html"
+    if relative in ("app", "app/"):
+        relative = "app/index.html"
     if "\x00" in relative or "\\" in relative:
         return None
     parts = relative.split("/")
     if any(p in ("", ".", "..") for p in parts):
         return None
     suffix = Path(relative).suffix.lower()
-    if parts[0] == "papers":
+    if parts[0] == "app":
+        # Only compiled frontend assets are public; never expose source or maps.
+        base = (Path(paths.resource_root) / "frontend" / "dist").resolve()
+        app_parts = parts[1:] or ["index.html"]
+        allowed = app_parts == ["index.html"] or (
+            len(app_parts) == 2 and app_parts[0] == "assets"
+            and not app_parts[1].startswith(".")
+            and suffix in (".js", ".css", ".svg", ".woff", ".woff2")
+        )
+        target = base.joinpath(*app_parts).resolve()
+    elif parts[0] == "papers":
         allowed = relative in ("papers/metadata.json", "papers/stats.data.json")
         if len(parts) > 2 and parts[1] == ".quick_reading_cache":
             allowed = (

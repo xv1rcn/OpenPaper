@@ -195,6 +195,25 @@ class RuntimeHTTPTests(RuntimeTestCase):
                 self.read(base + path)
             self.assertEqual(error.exception.code, 404)
 
+    def test_built_frontend_is_allowlisted_without_exposing_sources(self):
+        dist = self.resources / "frontend" / "dist"
+        (dist / "assets").mkdir(parents=True)
+        (dist / "index.html").write_text("<html>Vue app</html>")
+        (dist / "assets" / "app.js").write_text("/* compiled */")
+        (dist / "assets" / "app.js.map").write_text("private map")
+        (self.resources / "frontend" / "package.json").write_text("private config")
+        base = self.start_server()
+        for path in ("/app", "/app/", "/app/index.html"):
+            self.assertIn(b"Vue app", self.read(base + path))
+        self.assertIn(b"compiled", self.read(base + "/app/assets/app.js"))
+        for path in ("/frontend/package.json", "/app/assets/app.js.map", "/app/../package.json", "/app/src/main.ts"):
+            with self.subTest(path=path), self.assertRaises(HTTPError) as error:
+                self.read(base + path)
+            self.assertEqual(error.exception.code, 404)
+        (dist / "assets" / "escape.js").symlink_to(self.resources / "backend.py")
+        with self.assertRaises(HTTPError):
+            self.read(base + "/app/assets/escape.js")
+
     def test_two_servers_do_not_share_library_or_change_cwd(self):
         cwd = os.getcwd()
         other = RuntimePaths.resolve(self.root / "other-library", self.resources)

@@ -47,3 +47,9 @@ _docs/todo.md
 # Explicit runtime migration backup/marker (legacy repository-library mode)
 .legacy-speedread-migrated-v1
 metadata.json.before-inline-migration.bak
+
+# Vue desktop frontend
+frontend/node_modules/
+frontend/dist/
+frontend/test-results/
+frontend/playwright-report/

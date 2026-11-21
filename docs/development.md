@@ -72,3 +72,26 @@ POST 同一路径提交 `{provider, revision, apiKey?}`，设置 `Content-Type: 
 生成、连接测试与模型列表请求仅接收 `apiConfig: {useSaved: true}`，并要求与设置写入相同的自定义请求头。
 清空配置发送 `{revision, reset: true}`；预算字段允许 0 表示自动配置。
 运行前端检查：`node --test tests/settings-client.test.cjs`。
+
+## Vue 论文库
+
+需要 Node.js 24（CI 使用此版本）。首次运行：
+
+```sh
+cd frontend
+npm ci
+npm run build
+```
+
+然后启动 Python 服务，访问 `http://127.0.0.1:8001/app/`。构建产物不提交 Git；首次 clone 或修改前端后需重新 build。
+开发热更新：`npm run dev`，访问 `http://127.0.0.1:5173/app/`，同时保留后端 8001 服务。
+开发代理仅绑定本机；API 的 Host/Origin 由开发代理改写为后端地址，不是生产 Tauri 通信策略。
+
+```sh
+npm test
+npx playwright install chromium
+npm run test:e2e
+```
+
+端到端测试从 `frontend/e2e/server.py` 启动隔离服务，使用 8765 端口和临时论文库；默认 Python 为 `../.venv/bin/python`，可通过 `OPENPAPER_TEST_PYTHON` 覆盖。不复用用户 8001 服务。
+截图保存在忽略的 `frontend/test-results/`。测试入口不属于生产静态文件白名单。
