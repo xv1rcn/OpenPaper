@@ -139,8 +139,11 @@ async function remove(paper: Paper) {
 }
 function keyboard(event: KeyboardEvent) {
   if (
-    (event.metaKey || event.ctrlKey) &&
-    event.key.toLowerCase() === "k" &&
+    (((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k") ||
+      (event.key === "/" &&
+        !(event.target as HTMLElement)?.closest(
+          "input, textarea, select, [contenteditable=true]",
+        ))) &&
     !selected.value &&
     !settingsOpen.value
   ) {
@@ -399,6 +402,7 @@ onUnmounted(() => window.removeEventListener("keydown", keyboard));
     </main>
     <SettingsPanel v-if="settingsOpen" @close="closeSettings" />
     <PaperEditor
+      :available-tags="tags"
       :paper="selected"
       :busy="busy || importing"
       :error="error"

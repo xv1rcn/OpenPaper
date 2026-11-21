@@ -5,7 +5,6 @@ import {
   preferencesApi,
   appearanceDefaults,
   applyAppearance,
-  type Appearance,
 } from "@/lib/preferences";
 const emit = defineEmits<{ busy: [value: boolean]; dirty: [value: boolean] }>();
 const baseline = ref(JSON.stringify(appearanceDefaults));
@@ -41,7 +40,7 @@ async function save() {
     revision.value = data.revision;
     baseline.value = JSON.stringify(data.values);
     applyAppearance(data.values);
-    message.value = "外观已保存，书库与阅读页会在重新打开时使用。";
+    message.value = "已保存";
   } catch (e) {
     error.value = String(e);
   } finally {
@@ -66,37 +65,11 @@ function preset(theme: string) {
           }
         : { ...appearanceDefaults };
 }
-function importOld() {
-  try {
-    const old = JSON.parse(
-      localStorage.getItem("papers-visualizer-theme-v1") || "null",
-    );
-    if (!old) throw new Error("当前浏览器没有旧外观配置");
-    const next = {
-      theme: "light",
-      accent: old.accent,
-      background: old.bg,
-      readBackground: old.readBg,
-    };
-    if (
-      ![next.accent, next.background, next.readBackground].every(
-        (c) => typeof c === "string" && /^#[0-9a-f]{6}$/i.test(c),
-      )
-    )
-      throw new Error("旧外观颜色格式无效");
-    values.value = next;
-    message.value = "旧外观已载入，请点击保存外观。旧副本会保留。";
-  } catch (e) {
-    error.value = String(e);
-  }
-}
 onMounted(load);
 </script>
 <template>
   <section class="appearance-settings">
     <h3>外观</h3>
-    <p class="field-help">外观独立保存在本机，不影响模型或密钥配置。</p>
-    <button :disabled="busy" @click="importOld">载入旧版外观</button>
     <div class="preset-buttons">
       <Button variant="outline" :disabled="busy" @click="preset('light')"
         >浅色</Button

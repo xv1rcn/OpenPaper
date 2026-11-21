@@ -217,7 +217,18 @@ class PaperRequestHandler(SimpleHTTPRequestHandler):
             return
         if parsed.path == "/api/library":
             metadata = load_metadata(self.runtime.metadata)
-            self._send_json(200, {"ok": True, "papers": list(metadata.values())})
+            try:
+                index = json.loads((Path(self.runtime.speedreads) / "index.json").read_text(encoding="utf-8"))
+                statuses = index.get("items", {}) if isinstance(index, dict) else {}
+                if not isinstance(statuses, dict): statuses = {}
+            except (OSError, ValueError):
+                statuses = {}
+            papers = []
+            for key, paper in metadata.items():
+                item = statuses.get(key, {})
+                status = item.get("status", "") if isinstance(item, dict) else ""
+                papers.append({**paper, "speedread_status": status if status in ("success", "running", "error") else ""})
+            self._send_json(200, {"ok": True, "papers": papers})
             return
         if parsed.path == "/api/ping":
             self._send_json(200, {"ok": True, "service": "watchdog", "api_version": 1})

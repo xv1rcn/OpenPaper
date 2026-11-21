@@ -98,7 +98,7 @@ npm run test:e2e
 
 ## Vue 设置与导入
 
-新书库侧栏“速读设置”直接调用既有 `/api/settings`，无需转到旧首页。只有点击“测试接口”才调用模型；选择/保存配置不会进行付费模型调用。
+新书库侧栏“设置”直接调用既有 `/api/settings`，无需转到旧首页。只有点击“测试接口”才调用模型；选择/保存配置不会进行付费模型调用。
 旧浏览器配置导入必须在原来的 origin 中操作；开发预览 5173 与实际应用 8001 的浏览器存储互相隔离。
 
 `POST /api/import-pdf` 使用原始 PDF 请求体，要求 `Content-Type: application/pdf`、`X-OpenPaper-Request: 1`，以及经过百分号编码的 `X-File-Name`。上限 50 MB；当前不接受加密 PDF。

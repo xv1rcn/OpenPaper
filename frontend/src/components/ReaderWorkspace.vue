@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import NoteText from "./NoteText.vue";
 import { ref, computed, onMounted, onUnmounted } from "vue";
 import { ArrowLeft, RefreshCw, Download, Settings2, Trash2 } from "@lucide/vue";
 import Button from "./ui/button/Button.vue";
@@ -87,7 +88,7 @@ async function refresh() {
   }
 }
 async function generate() {
-  if (pending.value) return;
+  if (pending.value || reading.value.status === "running") return;
   if (
     reading.value.status === "success" &&
     !confirm("重新生成将替换当前速读结果，并调用模型。继续吗？")
@@ -156,6 +157,17 @@ onMounted(async () => {
     if (!paper.value) throw new Error("论文不存在或已移入回收站");
     await refresh();
     const old = reading.value.options || {};
+    if (["brief", "standard", "deep"].includes(String(old.depth)))
+      depth.value = String(old.depth);
+    if (Array.isArray(old.focus))
+      focus.value = old.focus.filter(
+        (v): v is string =>
+          typeof v === "string" &&
+          ["general", "experiment", "reproduction", "figure"].includes(v),
+      );
+    if (typeof old.include_figure_insights === "boolean")
+      figures.value = old.include_figure_insights;
+    if (typeof old.max_figures === "number") maxFigures.value = old.max_figures;
     if (typeof old.extra_prompt === "string") extra.value = old.extra_prompt;
   } catch (e) {
     error.value = String(e);
@@ -208,10 +220,10 @@ onUnmounted(() => {
             max="70"
             @change="saveLayout" /></label
         ><Button
-          :disabled="pending || !paper"
+          :disabled="pending || reading.status === 'running' || !paper"
           @click="optionsOpen = !optionsOpen"
           >{{
-            pending
+            pending || reading.status === "running"
               ? "生成中…"
               : reading.status === "success"
                 ? "重新生成速读"
@@ -355,11 +367,10 @@ onUnmounted(() => {
           </details>
           <section v-if="paper?.notes" class="reading-section">
             <h2>我的笔记</h2>
-            <p class="reading-text">{{ paper.notes }}</p>
+            <p class="reading-text"><NoteText :text="paper.notes" /></p>
           </section>
-        </article>
-      </div></template
-    >
+        </article></div
+    ></template>
     <SettingsPanel v-if="settings" @close="settings = false" />
   </div>
 </template>

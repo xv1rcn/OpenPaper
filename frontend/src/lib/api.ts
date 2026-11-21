@@ -49,6 +49,7 @@ export const api = {
 };
 export function normalizePaper(raw: Partial<Paper>): Paper {
   return {
+    speedread_status: raw.speedread_status || "",
     file_key: String(raw.file_key || ""),
     title: String(raw.title || "未命名论文"),
     authors: typeof raw.authors === "string" ? raw.authors : "",

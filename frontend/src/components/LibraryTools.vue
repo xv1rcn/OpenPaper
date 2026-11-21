@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref } from "vue";
+import { ref, computed, nextTick } from "vue";
 import Button from "./ui/button/Button.vue";
 import { api, request } from "@/lib/api";
 import { download, loadReading, normalizeReading } from "@/lib/reading";
@@ -10,6 +10,21 @@ const props = defineProps<{
   tags: string[];
 }>();
 const emit = defineEmits<{ changed: [] }>();
+const logView = ref<HTMLElement | null>(null),
+  autoScroll = ref(true);
+const filteredLogs = computed(() =>
+  logs.value
+    .filter((line) =>
+      line.toLowerCase().includes(logSearch.value.toLowerCase()),
+    )
+    .join("\n"),
+);
+async function copyLogs() {
+  await run(async () => {
+    await navigator.clipboard.writeText(filteredLogs.value);
+    message.value = "日志已复制";
+  });
+}
 const includeSummary = ref(false),
   busy = ref(false),
   error = ref(""),
@@ -90,6 +105,9 @@ function refreshLogs() {
   run(async () => {
     const data = await request<{ lines: string[] }>("/api/log?tail=500");
     logs.value = data.lines;
+    await nextTick();
+    if (autoScroll.value && logView.value)
+      logView.value.scrollTop = logView.value.scrollHeight;
   });
 }
 </script>
@@ -129,18 +147,22 @@ function refreshLogs() {
       <div class="tools-row">
         <Button variant="outline" :disabled="busy" @click="refreshLogs"
           >刷新日志</Button
+        ><Button
+          variant="outline"
+          :disabled="busy || !filteredLogs"
+          @click="copyLogs"
+          >复制日志</Button
+        >
+        <label
+          ><input type="checkbox" v-model="autoScroll" />自动滚动到底部</label
         ><input
           v-model="logSearch"
           aria-label="筛选日志"
           placeholder="筛选日志…"
         />
       </div>
-      <pre class="log-content">{{
-        logs
-          .filter((line) =>
-            line.toLowerCase().includes(logSearch.toLowerCase()),
-          )
-          .join("\n") || "点击刷新读取最近 500 行日志。"
+      <pre ref="logView" class="log-content">{{
+        filteredLogs || "暂无日志"
       }}</pre>
     </details>
   </section>

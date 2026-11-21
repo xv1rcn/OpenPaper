@@ -1612,3 +1612,165 @@ body,
   color: var(--accent);
   font-weight: 600;
 }
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+.card-note {
+  margin: 12px 0;
+  font-size: 12px;
+}
+.card-note p {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  max-height: 180px;
+  overflow: auto;
+}
+.speedread-link {
+  display: inline-block;
+  color: var(--accent);
+  margin: 10px 0;
+  font-size: 12px;
+}
+.extended-statistics {
+  display: grid;
+  gap: 24px;
+  margin-top: 24px;
+}
+.extended-statistics > section {
+  padding: 24px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+}
+.extended-statistics h2 {
+  margin-bottom: 16px;
+}
+.growth-chart {
+  width: 100%;
+  max-height: 280px;
+}
+.growth-chart text {
+  fill: currentColor;
+  font-size: 12px;
+}
+.statistics-table {
+  overflow-x: auto;
+}
+.extended-statistics table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+.extended-statistics th,
+.extended-statistics td {
+  padding: 9px;
+  text-align: left;
+  border-bottom: 1px solid var(--border);
+}
+.heatmap {
+  display: grid;
+  grid-template-rows: repeat(7, 10px);
+  grid-auto-flow: column;
+  grid-auto-columns: 10px;
+  gap: 3px;
+  overflow-x: auto;
+}
+.heatmap span {
+  border-radius: 2px;
+}
+.recent-papers {
+  list-style: none;
+  padding: 0;
+}
+.recent-papers li {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--border);
+}
+.recent-papers time {
+  white-space: nowrap;
+  font-size: 12px;
+}
+.relationship-graph {
+  width: 100%;
+  max-height: 600px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  touch-action: none;
+}
+.relationship-graph text {
+  fill: currentColor;
+  font-size: 12px;
+}
+.relationship-graph [role="button"] {
+  cursor: pointer;
+}
+.relationship-graph [role="button"]:focus circle {
+  stroke: currentColor;
+  stroke-width: 3px;
+}
+.tag-suggestions {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin: -4px 0 14px;
+}
+.tag-suggestions button {
+  padding: 3px 8px;
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  font-size: 12px;
+  color: var(--accent);
+}
+.statistics-panel,
+.extended-statistics,
+.extended-statistics > section,
+.stats-grid > section {
+  min-width: 0;
+}
+.extended-statistics > section {
+  border-color: var(--line);
+}
+.extended-statistics td,
+.extended-statistics th,
+.recent-papers li,
+.relationship-graph {
+  border-color: var(--line);
+}
+.recent-papers a,
+.knowledge-graph li {
+  overflow-wrap: anywhere;
+  min-width: 0;
+}
+@media (max-width: 600px) {
+  .extended-statistics > section,
+  .stats-grid section {
+    padding: 16px;
+  }
+  .extended-statistics .tools-row > label {
+    max-width: 100%;
+    flex-wrap: wrap;
+  }
+  .recent-papers li {
+    flex-direction: column;
+    gap: 4px;
+  }
+}
+.note-text {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.note-text a {
+  text-decoration: underline;
+  color: var(--accent);
+}

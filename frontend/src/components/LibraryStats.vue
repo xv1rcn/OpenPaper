@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import ReadingStatistics from "./ReadingStatistics.vue";
 import { computed } from "vue";
 import type { Paper } from "@/lib/types";
 const props = defineProps<{ papers: Paper[] }>();
@@ -65,5 +66,6 @@ const read = computed(() => props.papers.filter((p) => p.read).length);
         </div>
       </section>
     </div>
+    <ReadingStatistics :papers="papers" />
   </section>
 </template>

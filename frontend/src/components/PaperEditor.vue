@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, watch } from "vue";
+import { ref, watch, computed } from "vue";
 import {
   DialogRoot,
   DialogPortal,
@@ -16,6 +16,7 @@ import { parseTags } from "@/lib/library";
 import { api, pdfUrl } from "@/lib/api";
 const props = defineProps<{
   paper: Paper | null;
+  availableTags: string[];
   busy: boolean;
   error: string;
 }>();
@@ -63,6 +64,22 @@ watch(
     notes.value = paper?.notes || "";
   },
 );
+const tagSuggestions = computed(() => {
+  const parts = tags.value.split(/[,，]/),
+    needle = (parts.pop() || "").trim().toLowerCase();
+  const chosen = new Set(parts.map((p) => p.trim()));
+  return props.availableTags
+    .filter((tag) => !chosen.has(tag) && tag.toLowerCase().includes(needle))
+    .slice(0, 8);
+});
+function addTag(tag: string) {
+  const parts = tags.value.split(/[,，]/);
+  parts.pop();
+  tags.value =
+    [...new Set([...parts.map((p) => p.trim()).filter(Boolean), tag])].join(
+      ", ",
+    ) + ", ";
+}
 function save() {
   if (props.paper && title.value.trim())
     emit("save", props.paper, {
@@ -126,6 +143,18 @@ function save() {
               placeholder="用逗号分隔，如 OOD, 计算机视觉"
               :disabled="busy"
           /></label>
+          <div class="tag-suggestions">
+            <button
+              v-for="tag in tagSuggestions"
+              :key="tag"
+              type="button"
+              :disabled="busy"
+              :aria-label="'添加标签 ' + tag"
+              @click="addTag(tag)"
+            >
+              {{ tag }}
+            </button>
+          </div>
           <label
             >阅读笔记<textarea
               v-model="notes"

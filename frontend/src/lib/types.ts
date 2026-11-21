@@ -1,4 +1,5 @@
 export interface Paper {
+  speedread_status?: string;
   file_key: string;
   title: string;
   authors: string;

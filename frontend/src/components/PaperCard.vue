@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import NoteText from "./NoteText.vue";
 import { BookOpen, Check, MoreHorizontal, ArrowUpRight } from "@lucide/vue";
 import type { Paper } from "@/lib/types";
 import { readerUrl } from "@/lib/api";
@@ -51,6 +52,19 @@ defineEmits<{ edit: [paper: Paper]; toggleRead: [paper: Paper] }>();
           >+{{ paper.tags.length - 3 }}</span
         >
       </div>
+      <details v-if="paper.notes" class="card-note">
+        <summary>阅读笔记</summary>
+        <p><NoteText :text="paper.notes" /></p>
+      </details>
+      <a class="speedread-link" :href="readerUrl(paper)">{{
+        paper.speedread_status === "success"
+          ? "查看速读"
+          : paper.speedread_status === "running"
+            ? "速读生成中…"
+            : paper.speedread_status === "error"
+              ? "速读失败 · 查看详情"
+              : "生成速读"
+      }}</a>
       <div class="card-actions">
         <button
           :disabled="busy"

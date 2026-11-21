@@ -101,7 +101,7 @@ defineEmits<{
         >
           <Trash2 :size="17" />回收站<span>{{ recycled }}</span></button
         ><button @click="$emit('settings')">
-          <Settings2 :size="17" />速读设置
+          <Settings2 :size="17" />设置
         </button>
       </nav>
       <div class="local-status"><span></span>本地论文库 · 无需账号</div>

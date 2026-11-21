@@ -177,6 +177,24 @@ class RuntimeHTTPTests(RuntimeTestCase):
         with self.http.open(url, timeout=5) as response:
             return response.read()
 
+    def test_library_status_is_derived_without_changing_metadata(self):
+        original = Path(self.paths.metadata).read_bytes()
+        metadata = json.loads(original)
+        key = next(iter(metadata))
+        cache = Path(self.paths.speedreads)
+        cache.mkdir(parents=True, exist_ok=True)
+        index = cache / "index.json"
+        base = self.start_server()
+        for value, expected in [({"items": {key: {"status": "running"}}}, "running"),
+                                ({"items": {key: {"status": "success"}}}, "success"),
+                                ({"items": {key: None}}, ""), ({"items": []}, "")]:
+            index.write_text(json.dumps(value))
+            paper = json.loads(self.read(base + "/api/library"))["papers"][0]
+            self.assertEqual(paper["speedread_status"], expected)
+            self.assertEqual(Path(self.paths.metadata).read_bytes(), original)
+        index.write_text("broken")
+        self.assertEqual(json.loads(self.read(base + "/api/library"))["papers"][0]["speedread_status"], "")
+
     def test_static_and_library_api_use_different_roots(self):
         base = self.start_server()
         self.assertIn(b"fixture", self.read(base + "/"))

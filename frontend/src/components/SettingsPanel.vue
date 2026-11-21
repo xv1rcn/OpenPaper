@@ -157,10 +157,10 @@ onMounted(load);
         @pointer-down-outside="(event) => event.preventDefault()"
       >
         <DialogTitle class="dialog-title"
-          ><Settings2 :size="20" />速读设置</DialogTitle
+          ><Settings2 :size="20" />设置</DialogTitle
         >
-        <DialogDescription class="dialog-description"
-          >连接你自己的模型服务。普通配置保存在本机，密钥交由系统凭据库保管。</DialogDescription
+        <DialogDescription class="sr-only"
+          >应用外观与速读配置。</DialogDescription
         >
         <button
           class="dialog-close"
@@ -172,7 +172,7 @@ onMounted(load);
         </button>
         <div class="settings-tabs">
           <button :aria-pressed="tab === 'model'" @click="tab = 'model'">
-            模型服务</button
+            速读</button
           ><button
             :aria-pressed="tab === 'appearance'"
             @click="tab = 'appearance'"

@@ -1,6 +1,13 @@
 <script setup lang="ts">
+import { ref, computed } from "vue";
 import type { Paper } from "@/lib/types";
-defineProps<{ papers: Paper[]; allTags: string[] }>();
+const props = defineProps<{ papers: Paper[]; allTags: string[] }>();
+const search = ref("");
+const matchingTags = computed(() =>
+  props.allTags.filter((tag) =>
+    tag.toLowerCase().includes(search.value.toLowerCase()),
+  ),
+);
 const venue = defineModel<string>("venue", { required: true }),
   selected = defineModel<string[]>("tags", { required: true }),
   mode = defineModel<"any" | "all">("mode", { required: true });
@@ -42,8 +49,9 @@ const venue = defineModel<string>("venue", { required: true }),
         反选标签
       </button>
     </div>
+    <input v-model="search" aria-label="搜索筛选标签" placeholder="搜索标签" />
     <div class="filter-tags">
-      <label v-for="tag in allTags" :key="tag"
+      <label v-for="tag in matchingTags" :key="tag"
         ><input v-model="selected" type="checkbox" :value="tag" />{{
           tag
         }}</label

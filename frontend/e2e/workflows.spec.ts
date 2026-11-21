@@ -6,7 +6,7 @@ test("Vue settings persist without returning or storing credentials, and conflic
   page,
 }) => {
   await page.goto("/app/");
-  await page.getByRole("button", { name: "速读设置", exact: true }).click();
+  await page.getByRole("button", { name: "设置", exact: true }).click();
   await expect(
     page.getByRole("button", { name: "保存配置", exact: true }),
   ).toBeEnabled();
@@ -23,7 +23,7 @@ test("Vue settings persist without returning or storing credentials, and conflic
   );
   await page.getByRole("button", { name: "关闭设置" }).click();
   await page.reload();
-  await page.getByRole("button", { name: "速读设置", exact: true }).click();
+  await page.getByRole("button", { name: "设置", exact: true }).click();
   await expect(page.getByLabel("模型名称", { exact: true })).toHaveValue(
     "test-model",
   );
@@ -88,7 +88,7 @@ test("legacy import removes browser key only after verified backend save", async
       }),
     ),
   );
-  await page.getByRole("button", { name: "速读设置", exact: true }).click();
+  await page.getByRole("button", { name: "设置", exact: true }).click();
   await expect(page.getByRole("button", { name: "导入旧配置" })).toBeEnabled();
   await page.route("**/api/settings", async (route) => {
     if (route.request().method() === "POST")
