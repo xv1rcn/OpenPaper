@@ -148,12 +148,9 @@ class TagRecycleTests(unittest.TestCase):
         new_pdf = self.papers / "Fresh" / "new.pdf"
         new_pdf.parent.mkdir()
         new_pdf.write_bytes(b"%PDF-1.4 new")
-        template = self.root / "template.html"
-        template.write_text("<html>fixture</html>", encoding="utf-8")
         with patch.multiple(
             build, PDF_DIR=str(self.papers), METADATA_FILE=str(self.meta_file),
-            QUICK_READING_CACHE_DIR=str(self.cache), TEMPLATE_HTML=str(template),
-            OUTPUT_HTML=str(self.root / "index.html"),
+            QUICK_READING_CACHE_DIR=str(self.cache),
         ), patch.object(build, "configure_stdio"):
             build.main()
         rebuilt = self.read_metadata()

@@ -38,7 +38,7 @@ with tempfile.TemporaryDirectory(prefix="openpaper-e2e-") as temp:
     Path(paths.metadata).write_text(json.dumps(metadata), encoding="utf-8")
     write_speedread_cache('fixture-2.pdf', {
         'status': 'success', 'version': 1, 'model': 'test-model',
-        'content': {'one_sentence': 'Verified cached summary', 'quick_takeaways': ['Evidence survives export'],
+        'content': {'problem_and_motivation': 'Long motivation evidence. ' * 300 + 'LONG-CONTENT-END', 'one_sentence': 'Verified cached summary', 'quick_takeaways': ['Evidence survives export'],
             'method_overview': 'A reproducible test method', 'method_steps': ['First step', 'Second step'],
             'technical_detail_read': {'summary': 'Technical context', 'modules': [{'name': 'Module A', 'role': 'Testing', 'mechanism': 'Controlled fixture', 'page_refs': [2]}]},
             'experiment_read': {'summary': 'Experimental evidence'}, 'limitations': ['Synthetic fixture only']},

@@ -1,0 +1,9 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "OpenPaper",
+  "version": "0.1.0",
+  "identifier": "org.openpaper.desktop",
+  "build": { "frontendDist": "../frontend/dist" },
+  "app": { "windows": [], "security": { "capabilities": [] } },
+  "bundle": { "active": false }
+}

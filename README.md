@@ -1,4 +1,4 @@
-> 桌面化开发分支：已提供 Vue 论文库。先在 `frontend/` 执行 `npm ci && npm run build`，启动后端后访问 `/app/`。首页、旧速读与统计链接统一跳转 Vue；源码模板暂留用于迁移对照。详见 [开发说明](docs/development.md) 与 [实施计划](docs/implementation-plan.md)。
+> 桌面化开发分支：已提供 Vue 论文库。先在 `frontend/` 执行 `npm ci && npm run build`，启动后端后访问 `/app/`。首页、旧速读与统计链接统一跳转 Vue；旧页面源码已移除，旧 URL 保留兼容跳转。详见 [开发说明](docs/development.md) 与 [实施计划](docs/implementation-plan.md)。
 
 > **本 fork 正在迭代本地桌面版。** 已确定 Tauri + Vue 3 + Vite + Python；Readest 仅作交互参考。
 > 当前完成运行路径与启动基础改造，尚未提供新桌面 UI 或安装包。
@@ -23,7 +23,7 @@
 | **分组整理** | 按子目录自动分组，支持拖拽排序分组；也可切换到平铺模式全局浏览 |
 | **检索筛选** | 实时搜索标题/作者/标签；按会议、年份、分类标签（OR/AND）多维筛选 |
 | **阅读管理** | 标记已读/未读，一键只看未读，在资源管理器中定位 PDF 原文件 |
-| **可视化统计** | 内置独立统计面板（`stats.html`），展示年份分布、会议分布等图表 |
+| **可视化统计** | 内置 Vue 统计面板，展示年份分布、会议分布等图表 |
 | **AI 速读** | 对接 OpenAI 兼容接口（支持 VectorEngine、DeepSeek、本地 Ollama 等），生成结构化速读摘要，结果本地缓存 |
 | **回收站** | 删除论文移入本地回收站，支持恢复或永久清除 |
 | **开机自启** | 一行命令注册 Windows 任务计划，登录后自动在后台启动服务 |
@@ -117,7 +117,7 @@ python -m backend
 
 > 兼容旧用法：`python backend/server.py`、`python -m backend.server` 或 `uv run openpaper`。
 
-服务启动后会自动构建 `index.html`，并在后台监控 `papers/` 目录的变化。
+前端需先在 `frontend/` 构建；服务启动后会扫描并监控 `papers/` 目录。
 
 ### 第六步：打开浏览器
 
@@ -252,11 +252,10 @@ OpenPaper/
 |   |-- metadata.py       # metadata I/O + recycle bin
 |   |-- quick_reading/    # AI speed-read storage, prompts, PDF/figure extraction, LLM pipeline
 |   `-- watcher.py        # file system watcher
-|-- build.py              # refresh metadata/stats and copy template to index
-|-- template.html         # frontend SPA template
-|-- index.html            # generated stable frontend shell; data loads from papers/metadata.json
+|-- build.py              # refresh metadata/stats only (compatibility CLI)
 |-- quick-reading.html    # standalone speed-read page
-|-- stats.html            # statistics dashboard
+|-- frontend/             # Vue library, settings, statistics and PDF.js reader
+|-- desktop/              # Tauri development host
 |-- scripts/
 |   |-- fix_metadata.py
 |   |-- install_autostart.ps1 / .sh
@@ -301,7 +300,7 @@ A：先确认生成配置里勾选了「生成图表解读」，再检查本机�
 A：如果你本来就用 Syncthing/网盘同步 `papers/`，直接把 PDF、`papers/metadata.json` 和 `papers/stats.data.json` 一起同步即可；代码仓库本身继续单独管理，不需要把这些本地数据放进 git。
 
 **Q：想自定义前端样式怎么做？**  
-A：编辑 `template.html`，修改完成后运行 `python build.py` 重新生成 `index.html`，刷新浏览器生效。
+A：编辑 `frontend/src/`，在 `frontend/` 运行 `npm run build`，刷新浏览器生效。
 
 ---
 

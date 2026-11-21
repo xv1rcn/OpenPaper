@@ -6,6 +6,7 @@ import re
 import shutil
 import subprocess
 import tempfile
+import textwrap
 from dataclasses import dataclass, field
 from pathlib import Path
 from urllib.parse import quote
@@ -452,7 +453,7 @@ def _try_add_pdf_footer(pdf_path, document):
         total = doc.page_count
         for index, page in enumerate(doc, start=1):
             rect = page.rect
-            footer = f"OpenPaper AI 速读 · {index}/{total}"
+            footer = f"OpenPaper | {index}/{total}"
             page.insert_text((40, rect.height - 20), footer, fontsize=8, color=(0.39, 0.45, 0.55))
         tmp_path = pdf_path + ".footer.pdf"
         doc.save(tmp_path, garbage=4, deflate=True)
@@ -620,26 +621,25 @@ def _add_card(slide, card, left, top, width, height):
     _add_textbox(slide, left + Inches(0.16), top + Inches(0.43), width - Inches(0.32), height - Inches(0.52), _card_lines(card), size=12.5, color=TEXT)
 
 
+def _wrap_slide_lines(lines, width=52):
+    """Conservative character widths also fit full-width CJK glyphs."""
+    result = []
+    for text in lines:
+        for paragraph in str(text).splitlines() or [""]:
+            result.extend(textwrap.wrap(paragraph, width=width, replace_whitespace=False) or [""])
+    return result
+
+
 def _add_section_slides(prs, section):
     from pptx.util import Inches
-    chunks = _split_section_chunks(section)
-    for chunk_index, chunk in enumerate(chunks):
+    lines = list(section.paragraphs) + ["• " + item for item in section.bullets]
+    for card in section.cards:
+        lines.extend([card.title, *_card_lines(card), ""])
+    wrapped = _wrap_slide_lines(lines or [MISSING_TEXT])
+    for start in range(0, len(wrapped), 18):
         slide = _blank_slide(prs)
-        _add_slide_title(slide, section.title, continued=chunk_index > 0)
-        y = Inches(1.22)
-        for kind, payload, units in chunk:
-            if kind == "paragraphs":
-                height = Inches(max(0.55, min(1.7, 0.35 + units * 0.18)))
-                _add_textbox(slide, Inches(0.7), y, Inches(11.9), height, payload, size=15, color="111827")
-                y += height + Inches(0.12)
-            elif kind == "bullets":
-                height = Inches(max(0.75, min(4.8, 0.28 + units * 0.24)))
-                _add_textbox(slide, Inches(0.82), y, Inches(11.4), height, payload, size=14, bullet=True)
-                y += height + Inches(0.12)
-            else:
-                height = Inches(max(0.88, min(2.05, 0.38 + units * 0.19)))
-                _add_card(slide, payload, Inches(0.7), y, Inches(11.9), height)
-                y += height + Inches(0.12)
+        _add_slide_title(slide, section.title, continued=start > 0)
+        _add_textbox(slide, Inches(0.7), Inches(1.22), Inches(11.9), Inches(5.7), wrapped[start:start + 18], size=14)
 
 
 def _fit_image_size(image_path, max_width, max_height):

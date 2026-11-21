@@ -59,6 +59,7 @@ test("cached reading exports real PDF/PPTX content and restores deleted cache", 
     expect(text).toContain("Verified cached summary");
     expect(text).toContain("Evidence survives export");
     expect(text).toContain("Module A");
+    expect(text.replace(/\s+/g, "")).toContain("LONG-CONTENT-END");
   }
   page.once("dialog", (d) => d.accept());
   await page.getByRole("button", { name: "删除速读" }).click();

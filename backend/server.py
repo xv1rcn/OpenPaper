@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import os
+import secrets
+from http.cookies import SimpleCookie
 import argparse
 import signal
 import time
@@ -121,6 +123,7 @@ class PaperRequestHandler(SimpleHTTPRequestHandler):
         return public_file(self.runtime, path) or str(Path(self.runtime.resource_root) / ".denied")
 
     def send_head(self):
+        if not self._desktop_access(): return None
         target = public_file(self.runtime, self.path)
         if target is None or not os.path.isfile(target):
             self.send_error(404, "Not found")
@@ -164,7 +167,38 @@ class PaperRequestHandler(SimpleHTTPRequestHandler):
             return False
         return True
 
+    def _desktop_access(self):
+        token = getattr(self.server, "desktop_token", None)
+        if not token: return True
+        host = f"127.0.0.1:{self.server.server_port}"
+        if self.headers.get("Host") != host or self.headers.get("Origin", "http://" + host) != "http://" + host:
+            self._send_json(403, {"ok": False, "error": "拒绝非应用来源"})
+            return False
+        cookie = SimpleCookie()
+        try: cookie.load(self.headers.get("Cookie", ""))
+        except Exception: pass
+        value = cookie.get("openpaper_" + str(self.server.server_port))
+        if not value or not secrets.compare_digest(value.value.encode(), token.encode()):
+            self._send_json(401, {"ok": False, "error": "桌面会话无效，请重新打开应用"})
+            return False
+        return True
+
     def do_GET(self):
+        if urlparse(self.path).path == "/desktop/session":
+            token = getattr(self.server, "desktop_token", None)
+            given = (parse_qs(urlparse(self.path).query).get("token") or [""])[0]
+            if not token or self.headers.get("Host") != f"127.0.0.1:{self.server.server_port}" or not secrets.compare_digest(given.encode(), token.encode()):
+                self._send_json(403, {"ok": False, "error": "无效会话"})
+                return
+            self.send_response(302)
+            self.send_header("Set-Cookie", f"openpaper_{self.server.server_port}={token}; HttpOnly; SameSite=Strict; Path=/")
+            self.send_header("Location", "/app/")
+            self.send_header("Cache-Control", "no-store")
+            self.send_header("Referrer-Policy", "no-referrer")
+            self.send_header("Content-Length", "0")
+            self.end_headers()
+            return
+        if not self._desktop_access(): return
         parsed = urlparse(self.path)
         if parsed.path in ("/", "/index.html", "/quick-reading.html", "/stats.html"):
             target = "/app/"
@@ -236,6 +270,7 @@ class PaperRequestHandler(SimpleHTTPRequestHandler):
         super().do_GET()
 
     def do_POST(self):
+        if not self._desktop_access(): return
         parsed = urlparse(self.path)
         if parsed.path == "/api/import-pdf":
             if not self._settings_access(write=True, content_type="application/pdf"):
@@ -592,9 +627,10 @@ class QuietThreadingHTTPServer(ThreadingHTTPServer):
             return
         super().handle_error(request, client_address)
 
-def create_server(paths, port=HTTP_PORT, settings=None):
+def create_server(paths, port=HTTP_PORT, settings=None, desktop_token=None):
     """Construct an isolated server. Call bootstrap/scan explicitly before serving."""
     server = QuietThreadingHTTPServer(("127.0.0.1", port), PaperRequestHandler)
+    server.desktop_token = desktop_token
     server.runtime = paths
     server.settings = settings if settings is not None else SettingsStore()
     server.preferences = PreferencesStore(server.settings.path.parent)
@@ -609,16 +645,25 @@ def main(argv=None):
     parser.add_argument("--config-root", help="Private settings directory; defaults to OS user application data")
     parser.add_argument("--resource-root", help="Read-only legacy frontend assets")
     parser.add_argument("--ready-json", action="store_true", help="Emit a JSON readiness event for a future desktop host")
+    parser.add_argument("--desktop", action="store_true", help="Require desktop session and stop when parent stdin closes")
     args = parser.parse_args(argv)
+    desktop_token = os.environ.pop("OPENPAPER_DESKTOP_TOKEN", None) if args.desktop else None
+    if args.desktop and (not desktop_token or len(desktop_token) < 32):
+        parser.error("desktop mode requires a session token")
     if not 0 <= args.port <= 65535:
         parser.error("port must be between 0 and 65535")
     paths = RuntimePaths.resolve(args.library_root, args.resource_root)
     try:
-        httpd = create_server(paths, args.port, SettingsStore(args.config_root))
+        httpd = create_server(paths, args.port, SettingsStore(args.config_root), desktop_token)
     except OSError as exc:
         parser.exit(1, f"无法绑定 127.0.0.1:{args.port}: {exc}\n")
 
     stopped = threading.Event()
+    if args.desktop:
+        def watch_parent():
+            sys.stdin.buffer.read()
+            stopped.set()
+        threading.Thread(target=watch_parent, daemon=True).start()
     observer = Observer()
     serving = False
     watching = False

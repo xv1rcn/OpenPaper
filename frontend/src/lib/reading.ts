@@ -1,4 +1,4 @@
-import "../../../assets/quick-reading-common.js";
+import { normalizeSpeedReadContent } from "./reading-normalizer.js";
 import { request } from "./api";
 export interface SpeedRead {
   status?: string;
@@ -10,15 +10,8 @@ export interface SpeedRead {
   progress?: { message?: string; percent?: number };
   token_status?: Record<string, unknown>;
 }
-declare global {
-  interface Window {
-    QuickReadingCommon: {
-      normalizeSpeedReadContent(value: unknown): Record<string, unknown>;
-    };
-  }
-}
 export const normalizeReading = (value: SpeedRead) =>
-  window.QuickReadingCommon.normalizeSpeedReadContent(value);
+  normalizeSpeedReadContent(value);
 export const loadReading = (key: string) =>
   request<{ speed_read: SpeedRead }>(
     "/api/speedread-cache?file_key=" + encodeURIComponent(key),
