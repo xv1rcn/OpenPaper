@@ -158,7 +158,8 @@ test("card notes and speedread states remain visible in the new library", async 
     const response = await route.fetch();
     const data = await response.json();
     data.papers[0].speedread_status = "running";
-    data.papers[0].notes = "Visible note from the original library https://example.com/paper javascript:alert(1) <script>alert(1)</script>";
+    data.papers[0].notes =
+      "Visible note from the original library https://example.com/paper javascript:alert(1) <script>alert(1)</script>";
     await route.fulfill({ response, json: data });
   });
   await page.goto("/app/");
@@ -168,7 +169,7 @@ test("card notes and speedread states remain visible in the new library", async 
     .filter({ has: page.getByRole("link", { name: "速读生成中…" }) });
   await card.getByText("阅读笔记", { exact: true }).click();
   await expect(
-    card.getByText("Visible note from the original library", {exact:false}),
+    card.getByText("Visible note from the original library", { exact: false }),
   ).toBeVisible();
 });
 

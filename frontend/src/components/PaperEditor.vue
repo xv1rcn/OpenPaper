@@ -7,12 +7,12 @@ import {
   DialogContent,
   DialogTitle,
   DialogDescription,
-  DialogClose,
 } from "reka-ui";
 import { X, Trash2, ExternalLink } from "@lucide/vue";
 import Button from "./ui/button/Button.vue";
 import type { Paper } from "@/lib/types";
 import { parseTags } from "@/lib/library";
+import { useUnsavedChanges } from "@/composables/useUnsavedChanges";
 import { api, pdfUrl } from "@/lib/api";
 const props = defineProps<{
   paper: Paper | null;
@@ -64,6 +64,23 @@ watch(
     notes.value = paper?.notes || "";
   },
 );
+const dirty = computed(
+  () =>
+    !!props.paper &&
+    (title.value !== props.paper.title ||
+      authors.value !== props.paper.authors ||
+      year.value !== props.paper.year ||
+      venue.value !== props.paper.venue ||
+      bib.value !== props.paper.bib ||
+      notes.value !== props.paper.notes ||
+      JSON.stringify(parseTags(tags.value)) !==
+        JSON.stringify(props.paper.tags)),
+);
+useUnsavedChanges(dirty);
+function close() {
+  if (!props.busy && (!dirty.value || confirm("放弃未保存的论文修改？")))
+    emit("close");
+}
 const tagSuggestions = computed(() => {
   const parts = tags.value.split(/[,，]/),
     needle = (parts.pop() || "").trim().toLowerCase();
@@ -98,7 +115,7 @@ function save() {
     :open="!!paper"
     @update:open="
       (open) => {
-        if (!open && !busy) emit('close');
+        if (!open) close();
       }
     "
   >
@@ -107,7 +124,8 @@ function save() {
         class="dialog-content"
         @escape-key-down="
           (event) => {
-            if (busy) event.preventDefault();
+            event.preventDefault();
+            close();
           }
         "
         @pointer-down-outside="(event) => event.preventDefault()"
@@ -116,9 +134,14 @@ function save() {
         ><DialogDescription class="dialog-description"
           >整理标题、标签和笔记。修改会保存在本地论文库。</DialogDescription
         >
-        <DialogClose class="dialog-close" aria-label="关闭" :disabled="busy"
-          ><X :size="19"
-        /></DialogClose>
+        <button
+          class="dialog-close"
+          aria-label="关闭"
+          :disabled="busy"
+          @click="close"
+        >
+          <X :size="19" />
+        </button>
         <form @submit.prevent="save">
           <label
             >标题<input
@@ -189,7 +212,7 @@ function save() {
               type="button"
               variant="outline"
               :disabled="busy"
-              @click="emit('close')"
+              @click="close"
               >取消</Button
             ><Button type="submit" :disabled="busy || !title.trim()">{{
               busy ? "保存中…" : "保存修改"

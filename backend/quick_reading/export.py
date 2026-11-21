@@ -480,6 +480,8 @@ def _export_pdf(document, workspace_root, quick_reading_cache_dir):
             browser,
             "--headless",
             "--disable-gpu",
+            "--no-pdf-header-footer",
+            f"--user-data-dir={os.path.join(temp_dir, 'browser-profile')}",
             "--no-sandbox",
             "--disable-dev-shm-usage",
             "--allow-file-access-from-files",

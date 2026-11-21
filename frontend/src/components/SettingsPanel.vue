@@ -10,6 +10,7 @@ import {
 } from "reka-ui";
 import { X, ShieldCheck, Download, Settings2 } from "@lucide/vue";
 import Button from "./ui/button/Button.vue";
+import { useUnsavedChanges } from "@/composables/useUnsavedChanges";
 import AppearanceSettings from "./AppearanceSettings.vue";
 const tab = ref("model"),
   appearanceBusy = ref(false),
@@ -36,6 +37,7 @@ const dirty = computed(
     (!!saved.value &&
       JSON.stringify(provider.value) !== JSON.stringify(saved.value.provider)),
 );
+useUnsavedChanges(computed(() => dirty.value || appearanceDirty.value));
 function apply(data: Settings) {
   saved.value = data;
   provider.value = { ...data.provider };

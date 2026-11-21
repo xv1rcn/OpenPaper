@@ -42,7 +42,15 @@ export async function exportReading(key: string, format: "pdf" | "pptx") {
     const data = await response.json().catch(() => ({}));
     throw new Error(data.error || "导出失败");
   }
-  download(await response.blob(), `OpenPaper-speedread.${format}`);
+  const disposition = response.headers.get("Content-Disposition") || "";
+  const encoded = disposition.match(/filename\*=UTF-8''([^;]+)/i)?.[1];
+  let name = `OpenPaper-speedread.${format}`;
+  if (encoded) {
+    try {
+      name = decodeURIComponent(encoded).replace(/[\\/\x00-\x1f]/g, "_");
+    } catch {}
+  }
+  download(await response.blob(), name);
 }
 export function safeFigure(value: unknown) {
   if (typeof value !== "string") return undefined;

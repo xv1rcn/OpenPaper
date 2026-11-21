@@ -195,6 +195,18 @@ class RuntimeHTTPTests(RuntimeTestCase):
         index.write_text("broken")
         self.assertEqual(json.loads(self.read(base + "/api/library"))["papers"][0]["speedread_status"], "")
 
+    def test_open_folder_selects_library_file_and_rejects_escape(self):
+        base = self.start_server()
+        with patch("backend.server.sys.platform", "darwin"), patch("backend.server.subprocess.Popen") as launch:
+            result = json.loads(self.read(base + "/api/open-folder?path=papers%2FTopic%2Fpaper-icml24.pdf"))
+            self.assertTrue(result["ok"])
+            self.assertEqual(launch.call_args.args[0], ["open", "-R", str(Path(self.paths.papers) / "Topic/paper-icml24.pdf")])
+            launch.reset_mock()
+            with self.assertRaises(HTTPError) as error:
+                self.read(base + "/api/open-folder?path=..%2F..%2Fprivate")
+            self.assertEqual(error.exception.code, 403)
+            launch.assert_not_called()
+
     def test_static_and_library_api_use_different_roots(self):
         base = self.start_server()
         self.assertIn(b"fixture", self.read(base + "/"))
