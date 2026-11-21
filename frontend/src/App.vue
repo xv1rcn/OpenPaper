@@ -13,6 +13,11 @@ import {
 } from "@lucide/vue";
 import LibrarySidebar from "./components/LibrarySidebar.vue";
 import PaperCard from "./components/PaperCard.vue";
+import ReaderWorkspace from "./components/ReaderWorkspace.vue";
+import LibraryTools from "./components/LibraryTools.vue";
+import LibraryStats from "./components/LibraryStats.vue";
+import GroupedLibrary from "./components/GroupedLibrary.vue";
+import AdvancedFilters from "./components/AdvancedFilters.vue";
 import PaperEditor from "./components/PaperEditor.vue";
 import SettingsPanel from "./components/SettingsPanel.vue";
 import ImportPdf from "./components/ImportPdf.vue";
@@ -22,6 +27,9 @@ import { api } from "./lib/api";
 import type { Paper } from "./lib/types";
 const {
   papers,
+  venue,
+  selectedTags,
+  tagMode,
   recycle,
   loading,
   busy,
@@ -37,6 +45,23 @@ const {
   mutate,
   navigate,
 } = useLibrary();
+const routeKey = new URLSearchParams(location.search).get("file_key") || "";
+const exportSelection = ref<Paper[]>([]);
+function navigateView(next: import("./lib/types").Collection, nextTag = "") {
+  if (next === "tools") exportSelection.value = [...visible.value];
+  navigate(next, nextTag);
+}
+async function purge(id?: string) {
+  if (
+    !confirm(
+      id
+        ? "永久删除此回收站项目？无法撤销。"
+        : "清空整个回收站？所有项目将永久删除，无法撤销。",
+    )
+  )
+    return;
+  await mutate(() => (id ? api.purge(id) : api.purgeAll()), "已永久删除。");
+}
 const settingsOpen = ref(false),
   importing = ref(false);
 let settingsOpener: HTMLElement | null = null;
@@ -48,6 +73,16 @@ async function closeSettings() {
   settingsOpen.value = false;
   await nextTick();
   settingsOpener?.focus();
+}
+const grouped = ref(false);
+try {
+  grouped.value = localStorage.getItem("openpaper-grouped") === "true";
+} catch {}
+function toggleGrouping() {
+  grouped.value = !grouped.value;
+  try {
+    localStorage.setItem("openpaper-grouped", String(grouped.value));
+  } catch {}
 }
 const layout = ref<"grid" | "list">("grid");
 try {
@@ -82,6 +117,8 @@ const title = computed(
       unread: "待读论文",
       read: "已读论文",
       recycle: "回收站",
+      stats: "统计面板",
+      tools: "导出与管理",
     }[collection.value],
 );
 async function save(paper: Paper, fields: Partial<Paper>) {
@@ -112,13 +149,16 @@ function keyboard(event: KeyboardEvent) {
   }
 }
 onMounted(() => {
+  if (new URLSearchParams(location.search).get("view") === "stats")
+    navigate("stats");
   refresh();
   window.addEventListener("keydown", keyboard);
 });
 onUnmounted(() => window.removeEventListener("keydown", keyboard));
 </script>
 <template>
-  <div class="app-shell">
+  <ReaderWorkspace v-if="routeKey" :file-key="routeKey" />
+  <div v-else class="app-shell">
     <LibrarySidebar
       :collection="collection"
       :tag="tag"
@@ -126,7 +166,7 @@ onUnmounted(() => window.removeEventListener("keydown", keyboard));
       :total="papers.length"
       :unread="unread"
       :recycled="recycle.length"
-      @navigate="navigate"
+      @navigate="navigateView"
       @settings="openSettings"
     />
     <main class="main-content">
@@ -185,7 +225,15 @@ onUnmounted(() => window.removeEventListener("keydown", keyboard));
             >重试</Button
           >
         </div>
-        <template v-if="collection !== 'recycle'">
+        <LibraryStats v-if="collection === 'stats'" :papers="papers" />
+        <LibraryTools
+          v-else-if="collection === 'tools'"
+          :papers="papers"
+          :filtered="exportSelection"
+          :tags="tags"
+          @changed="refresh"
+        />
+        <template v-else-if="collection !== 'recycle'">
           <section class="library-toolbar" aria-label="筛选与排序">
             <div class="search-box">
               <Search :size="17" /><input
@@ -198,10 +246,18 @@ onUnmounted(() => window.removeEventListener("keydown", keyboard));
               ><kbd v-else>⌘ K</kbd>
             </div>
             <div class="toolbar-options">
+              <button :aria-pressed="grouped" @click="toggleGrouping">
+                按标签分组
+              </button>
               <select v-model="sort" aria-label="排序方式">
                 <option value="recent">最近添加</option>
                 <option value="title">标题顺序</option>
-                <option value="year">发表年份</option>
+                <option value="year">年份：新到旧</option>
+                <option value="year-asc">年份：旧到新</option>
+                <option value="oldest">最早添加</option>
+                <option value="title-desc">标题倒序</option>
+                <option value="venue">会议名称正序</option>
+                <option value="venue-desc">会议名称倒序</option>
               </select>
               <div class="layout-switch" aria-label="显示方式">
                 <button
@@ -220,6 +276,13 @@ onUnmounted(() => window.removeEventListener("keydown", keyboard));
               </div>
             </div>
           </section>
+          <AdvancedFilters
+            :papers="papers"
+            :all-tags="tags"
+            v-model:venue="venue"
+            v-model:tags="selectedTags"
+            v-model:mode="tagMode"
+          />
           <div class="shelf-label">
             <span>{{
               tag
@@ -255,6 +318,20 @@ onUnmounted(() => window.removeEventListener("keydown", keyboard));
               >查看全部论文</Button
             >
           </div>
+          <GroupedLibrary
+            v-else-if="grouped"
+            :papers="visible"
+            :layout="layout"
+            :busy="busy || importing"
+            @edit="edit"
+            @toggle-read="
+              (paper) =>
+                mutate(
+                  () => api.update(paper.file_key, { read: !paper.read }),
+                  '阅读状态已保存。',
+                )
+            "
+          />
           <div
             v-else
             class="paper-grid"
@@ -283,6 +360,13 @@ onUnmounted(() => window.removeEventListener("keydown", keyboard));
           </footer>
         </template>
         <section v-else aria-label="已删除的项目">
+          <Button
+            v-if="recycle.length"
+            variant="outline"
+            :disabled="busy"
+            @click="purge()"
+            >清空回收站</Button
+          >
           <div v-if="!recycle.length" class="empty-state">
             <RotateCcw :size="36" :stroke-width="1" />
             <h2>回收站是空的</h2>
@@ -305,6 +389,9 @@ onUnmounted(() => window.removeEventListener("keydown", keyboard));
               :disabled="busy"
               @click="mutate(() => api.restore(item.id), '项目已恢复。')"
               ><RotateCcw :size="14" />恢复</Button
+            >
+            <Button variant="ghost" :disabled="busy" @click="purge(item.id)"
+              >永久删除</Button
             >
           </article>
         </section>

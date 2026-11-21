@@ -6,8 +6,12 @@ import {
   Hash,
   Trash2,
   Settings2,
+  ChartColumn,
+  SlidersHorizontal,
   Leaf,
 } from "@lucide/vue";
+import { ref } from "vue";
+const tagQuery = ref("");
 import type { Collection } from "@/lib/types";
 
 defineProps<{
@@ -52,12 +56,33 @@ defineEmits<{
         <CheckCheck :size="18" />已读<span>{{ total - unread }}</span>
       </button>
     </nav>
+    <nav class="secondary-navigation">
+      <button
+        :class="{ active: collection === 'stats' }"
+        @click="$emit('navigate', 'stats')"
+      >
+        <ChartColumn :size="17" />统计面板</button
+      ><button
+        :class="{ active: collection === 'tools' }"
+        @click="$emit('navigate', 'tools')"
+      >
+        <SlidersHorizontal :size="17" />导出与管理
+      </button>
+    </nav>
     <div class="workspace-label tag-heading">
       标签 <span>{{ tags.length }}</span>
     </div>
+    <input
+      class="tag-search"
+      v-model="tagQuery"
+      aria-label="查找标签"
+      placeholder="查找标签…"
+    />
     <nav class="tag-navigation" aria-label="标签筛选">
       <button
-        v-for="item in tags"
+        v-for="item in tags.filter((t) =>
+          t.toLowerCase().includes(tagQuery.toLowerCase()),
+        )"
         :key="item"
         :class="{ active: tag === item }"
         @click="$emit('navigate', 'all', item)"

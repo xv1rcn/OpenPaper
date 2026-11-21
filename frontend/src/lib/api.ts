@@ -23,9 +23,28 @@ export const api = {
   recycle: () => request<{ items: RecycleItem[] }>("/api/recycle-list"),
   update: (
     file_key: string,
-    fields: Partial<Pick<Paper, "title" | "tags" | "read" | "notes">>,
+    fields: Partial<
+      Pick<
+        Paper,
+        | "title"
+        | "tags"
+        | "read"
+        | "notes"
+        | "authors"
+        | "year"
+        | "venue"
+        | "bib"
+      >
+    >,
   ) => request("/api/update-paper", { file_key, fields }),
   remove: (file_key: string) => request("/api/delete-paper", { file_key }),
+  deleteTag: (tag: string) => request("/api/delete-tag", { tag }),
+  purge: (id: string) => request("/api/recycle-purge", { id }),
+  purgeAll: () => request("/api/recycle-purge-all", {}),
+  deleteSpeedread: (file_key: string) =>
+    request("/api/delete-speedread", { file_key }),
+  openFolder: (paper: Paper) =>
+    request("/api/open-folder?path=" + encodeURIComponent(paper.pdf)),
   restore: (id: string) => request("/api/recycle-restore", { id }),
 };
 export function normalizePaper(raw: Partial<Paper>): Paper {
@@ -41,12 +60,13 @@ export function normalizePaper(raw: Partial<Paper>): Paper {
     pdf: String(raw.pdf || ""),
     read: raw.read === true,
     notes: String(raw.notes || ""),
+    bib: String(raw.bib || ""),
     added_at: String(raw.added_at || ""),
   };
 }
 export const legacyOrigin = import.meta.env.DEV ? "http://127.0.0.1:8001" : "";
 export const readerUrl = (paper: Paper) =>
-  `${legacyOrigin}/quick-reading.html?file_key=${encodeURIComponent(paper.file_key)}`;
+  `/app/?file_key=${encodeURIComponent(paper.file_key)}`;
 export function pdfUrl(paper: Paper): string | null {
   const parts = paper.pdf.split("/").map((part) => {
     try {

@@ -8,6 +8,7 @@ export interface Paper {
   pdf: string;
   read: boolean;
   notes: string;
+  bib: string;
   added_at: string;
 }
 export interface RecycleItem {
@@ -18,5 +19,14 @@ export interface RecycleItem {
   tag?: string;
   affected_count?: number;
 }
-export type Collection = "all" | "unread" | "read" | "recycle";
-export type Sort = "recent" | "title" | "year";
+export type Collection =
+  "all" | "unread" | "read" | "recycle" | "stats" | "tools";
+export type Sort =
+  | "recent"
+  | "oldest"
+  | "title"
+  | "title-desc"
+  | "year"
+  | "year-asc"
+  | "venue"
+  | "venue-desc";

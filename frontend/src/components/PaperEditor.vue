@@ -13,7 +13,7 @@ import { X, Trash2, ExternalLink } from "@lucide/vue";
 import Button from "./ui/button/Button.vue";
 import type { Paper } from "@/lib/types";
 import { parseTags } from "@/lib/library";
-import { pdfUrl } from "@/lib/api";
+import { api, pdfUrl } from "@/lib/api";
 const props = defineProps<{
   paper: Paper | null;
   busy: boolean;
@@ -23,16 +23,41 @@ const emit = defineEmits<{
   close: [];
   save: [
     paper: Paper,
-    fields: { title: string; tags: string[]; notes: string },
+    fields: {
+      title: string;
+      tags: string[];
+      notes: string;
+      authors: string;
+      year: string;
+      venue: string;
+      bib: string;
+    },
   ];
   remove: [paper: Paper];
 }>();
+const authors = ref(""),
+  year = ref(""),
+  venue = ref(""),
+  bib = ref(""),
+  folderError = ref("");
+async function openFolder() {
+  try {
+    if (props.paper) await api.openFolder(props.paper);
+  } catch (e) {
+    folderError.value = String(e);
+  }
+}
 const title = ref(""),
   tags = ref(""),
   notes = ref("");
 watch(
   () => props.paper,
   (paper) => {
+    folderError.value = "";
+    authors.value = paper?.authors || "";
+    year.value = paper?.year || "";
+    venue.value = paper?.venue || "";
+    bib.value = paper?.bib || "";
     title.value = paper?.title || "";
     tags.value = paper?.tags.join(", ") || "";
     notes.value = paper?.notes || "";
@@ -44,6 +69,10 @@ function save() {
       title: title.value.trim(),
       tags: parseTags(tags.value),
       notes: notes.value,
+      authors: authors.value,
+      year: year.value,
+      venue: venue.value,
+      bib: bib.value,
     });
 }
 </script>
@@ -81,6 +110,16 @@ function save() {
               maxlength="1000"
               :disabled="busy"
           /></label>
+          <label>作者<input v-model="authors" :disabled="busy" /></label>
+          <div class="settings-numbers">
+            <label>年份<input v-model="year" :disabled="busy" /></label
+            ><label
+              >会议 / 期刊<input v-model="venue" :disabled="busy"
+            /></label>
+          </div>
+          <label
+            >BibTeX<textarea v-model="bib" rows="3" :disabled="busy" />
+          </label>
           <label
             >标签<input
               v-model="tags"
@@ -96,6 +135,10 @@ function save() {
             ></textarea>
           </label>
           <p v-if="error" class="inline-error" role="alert">{{ error }}</p>
+          <p v-if="folderError" role="alert" class="inline-error">
+            {{ folderError }}
+          </p>
+          <button type="button" @click="openFolder">打开所在目录</button>
           <div class="editor-links">
             <a
               v-if="paper && pdfUrl(paper)"

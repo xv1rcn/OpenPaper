@@ -1,4 +1,4 @@
-> 桌面化开发分支：已提供 Vue 论文库。先在 `frontend/` 执行 `npm ci && npm run build`，启动后端后访问 `/app/`。原首页和速读页保留。详见 [开发说明](docs/development.md) 与 [实施计划](docs/implementation-plan.md)。
+> 桌面化开发分支：已提供 Vue 论文库。先在 `frontend/` 执行 `npm ci && npm run build`，启动后端后访问 `/app/`。首页、旧速读与统计链接统一跳转 Vue；源码模板暂留用于迁移对照。详见 [开发说明](docs/development.md) 与 [实施计划](docs/implementation-plan.md)。
 
 > **本 fork 正在迭代本地桌面版。** 已确定 Tauri + Vue 3 + Vite + Python；Readest 仅作交互参考。
 > 当前完成运行路径与启动基础改造，尚未提供新桌面 UI 或安装包。

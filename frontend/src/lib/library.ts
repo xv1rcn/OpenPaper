@@ -20,15 +20,24 @@ export function filterPapers(
             .includes(term),
         ),
     )
-    .sort(
-      (a, b) =>
-        (sort === "title"
-          ? a.title.localeCompare(b.title, "zh-CN")
-          : sort === "year"
-            ? (Number(b.year) || 0) - (Number(a.year) || 0)
-            : b.added_at.localeCompare(a.added_at)) ||
-        a.file_key.localeCompare(b.file_key),
-    );
+    .sort((a, b) => {
+      const title = a.title.localeCompare(b.title, "zh-CN");
+      const venue = a.venue.localeCompare(b.venue, "zh-CN");
+      const year = (Number(b.year) || 0) - (Number(a.year) || 0);
+      const date = b.added_at.localeCompare(a.added_at);
+      return (
+        {
+          title,
+          "title-desc": -title,
+          venue,
+          "venue-desc": -venue,
+          year,
+          "year-asc": -year,
+          recent: date,
+          oldest: -date,
+        }[sort] || a.file_key.localeCompare(b.file_key)
+      );
+    });
 }
 export function parseTags(text: string) {
   return [

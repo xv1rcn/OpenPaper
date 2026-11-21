@@ -36,7 +36,7 @@ def public_file(paths, url):
         base = Path(paths.papers).resolve()
         target = base.joinpath(*parts[1:]).resolve()
     else:
-        allowed = relative in ("index.html", "quick-reading.html", "stats.html", "favicon.svg")
+        allowed = relative in ("favicon.svg",)
         if parts[0] == "assets" and len(parts) > 1:
             allowed = not any(p.startswith(".") for p in parts) and suffix in (
                 ".js", ".css", ".png", ".jpg", ".svg", ".woff", ".woff2",

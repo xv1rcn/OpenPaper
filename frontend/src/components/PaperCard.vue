@@ -6,7 +6,10 @@ defineProps<{ paper: Paper; layout: "grid" | "list"; busy: boolean }>();
 defineEmits<{ edit: [paper: Paper]; toggleRead: [paper: Paper] }>();
 </script>
 <template>
-  <article class="paper-card" :class="{ 'paper-row': layout === 'list' }">
+  <article
+    class="paper-card"
+    :class="{ 'paper-row': layout === 'list', 'is-read': paper.read }"
+  >
     <a
       :href="readerUrl(paper)"
       class="paper-cover"

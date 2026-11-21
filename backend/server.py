@@ -36,6 +36,7 @@ from backend.library.scanner import scan_library
 from backend.library.locking import library_lock
 from backend.library.importer import import_pdf, PDFImportError, MAX_PDF_BYTES
 from backend.settings.store import SettingsStore, SettingsError, ConflictError
+from backend.settings.preferences import PreferencesStore
 
 HTTP_PORT = 8000
 SPEEDREAD_MAX_IMAGE_PAGES = 5
@@ -165,6 +166,29 @@ class PaperRequestHandler(SimpleHTTPRequestHandler):
 
     def do_GET(self):
         parsed = urlparse(self.path)
+        if parsed.path in ("/", "/index.html", "/quick-reading.html", "/stats.html"):
+            target = "/app/"
+            if parsed.path == "/quick-reading.html":
+                key = (parse_qs(parsed.query).get("file_key") or [""])[0]
+                if key: target += "?file_key=" + quote(key, safe="")
+            elif parsed.path == "/stats.html":
+                target += "?view=stats"
+            if not (Path(self.runtime.resource_root) / "frontend/dist/index.html").is_file():
+                self._send_json(503, {"ok": False, "error": "前端尚未构建，请在 frontend 中运行 npm ci && npm run build"})
+                return
+            self.send_response(302)
+            self.send_header("Location", target)
+            self.send_header("Cache-Control", "no-store")
+            self.send_header("Content-Length", "0")
+            self.end_headers()
+            return
+        if parsed.path == "/api/preferences":
+            if not self._settings_access(): return
+            try:
+                self._send_json(200, {"ok": True, **self.server.preferences.read()})
+            except SettingsError as exc:
+                self._send_json(400, {"ok": False, "error": str(exc)})
+            return
         if parsed.path == "/api/settings":
             if not self._settings_access():
                 return
@@ -219,6 +243,23 @@ class PaperRequestHandler(SimpleHTTPRequestHandler):
                 self._send_json(400, {"ok": False, "error": str(exc)})
             except OSError:
                 self._send_json(500, {"ok": False, "error": "无法写入论文库，请检查目录权限或磁盘空间"})
+            return
+        if parsed.path == "/api/preferences":
+            if not self._settings_access(write=True): return
+            try:
+                length = int(self.headers.get("Content-Length", "0"))
+                if not 0 < length <= 8192 or self.headers.get("Transfer-Encoding"):
+                    raise SettingsError("外观请求大小无效")
+                payload = json.loads(self.rfile.read(length))
+                if not isinstance(payload, dict): raise SettingsError("外观请求格式无效")
+                result = self.server.preferences.save(payload.get("values"), payload.get("revision"))
+                self._send_json(200, {"ok": True, **result})
+            except ConflictError as exc:
+                self._send_json(409, {"ok": False, "error": str(exc)})
+            except (ValueError, SettingsError):
+                self._send_json(400, {"ok": False, "error": "外观配置无效，未保存"})
+            except OSError:
+                self._send_json(500, {"ok": False, "error": "外观保存失败，请检查磁盘权限"})
             return
         if parsed.path == "/api/settings":
             if not self._settings_access(write=True):
@@ -545,6 +586,7 @@ def create_server(paths, port=HTTP_PORT, settings=None):
     server = QuietThreadingHTTPServer(("127.0.0.1", port), PaperRequestHandler)
     server.runtime = paths
     server.settings = settings if settings is not None else SettingsStore()
+    server.preferences = PreferencesStore(server.settings.path.parent)
     return server
 
 

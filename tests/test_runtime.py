@@ -33,6 +33,8 @@ class RuntimeTestCase(unittest.TestCase):
         self.resources.mkdir()
         (self.resources / "index.html").write_text("<html>fixture</html>", encoding="utf-8")
         (self.resources / "backend.py").write_text("private source", encoding="utf-8")
+        (self.resources / "frontend/dist").mkdir(parents=True)
+        (self.resources / "frontend/dist/index.html").write_text("<html>fixture</html>")
         self.library = self.root / "library"
         self.paths = RuntimePaths.resolve(self.library, self.resources)
 
@@ -197,7 +199,7 @@ class RuntimeHTTPTests(RuntimeTestCase):
 
     def test_built_frontend_is_allowlisted_without_exposing_sources(self):
         dist = self.resources / "frontend" / "dist"
-        (dist / "assets").mkdir(parents=True)
+        (dist / "assets").mkdir(parents=True, exist_ok=True)
         (dist / "index.html").write_text("<html>Vue app</html>")
         (dist / "assets" / "app.js").write_text("/* compiled */")
         (dist / "assets" / "app.js.map").write_text("private map")

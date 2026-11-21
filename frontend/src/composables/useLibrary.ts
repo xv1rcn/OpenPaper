@@ -9,6 +9,9 @@ export function useLibrary() {
     busy = ref(false),
     error = ref(""),
     notice = ref("");
+  const venue = ref(""),
+    selectedTags = ref<string[]>([]),
+    tagMode = ref<"any" | "all">("any");
   const query = ref(""),
     collection = ref<Collection>("all"),
     tag = ref(""),
@@ -20,7 +23,14 @@ export function useLibrary() {
   );
   const visible = computed(() =>
     filterPapers(
-      papers.value,
+      papers.value.filter(
+        (p) =>
+          (!venue.value || p.venue === venue.value) &&
+          (!selectedTags.value.length ||
+            (tagMode.value === "all"
+              ? selectedTags.value.every((t) => p.tags.includes(t))
+              : selectedTags.value.some((t) => p.tags.includes(t)))),
+      ),
       query.value,
       collection.value,
       tag.value,
@@ -61,8 +71,13 @@ export function useLibrary() {
     collection.value = next;
     tag.value = nextTag;
     query.value = "";
+    venue.value = "";
+    selectedTags.value = [];
   }
   return {
+    venue,
+    selectedTags,
+    tagMode,
     papers,
     recycle,
     loading,
