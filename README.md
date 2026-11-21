@@ -1,3 +1,7 @@
+> **本 fork 正在迭代本地桌面版。** 已确定 Tauri + Vue 3 + Vite + Python；Readest 仅作交互参考。
+> 当前完成运行路径与启动基础改造，尚未提供新桌面 UI 或安装包。
+> [架构决策](docs/architecture/0001-local-desktop.md) · [迭代计划](docs/implementation-plan.md) · [开发与验证](docs/development.md)
+
 # 📚 OpenPaper
 
 **为研究生打造的本地论文管理与速读工具**

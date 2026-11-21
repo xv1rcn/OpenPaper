@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+import re
 import sys
 from datetime import datetime
 
@@ -44,10 +45,11 @@ def safe_rel(rel: str, workspace_root: str) -> str | None:
     Returns the absolute path if valid, or None if the path escapes
     the workspace root.
     """
-    rel = (rel or "").replace("\\", "/").lstrip("/")
-    if not rel:
+    rel = (rel or "").replace("\\", "/")
+    if not rel or "\x00" in rel or os.path.isabs(rel) or re.match(r"^[A-Za-z]:", rel):
         return None
-    abs_path = os.path.abspath(os.path.join(workspace_root, rel))
+    workspace_root = os.path.realpath(workspace_root)
+    abs_path = os.path.realpath(os.path.join(workspace_root, rel))
     try:
         common = os.path.commonpath([workspace_root, abs_path])
     except ValueError:

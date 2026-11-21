@@ -20,6 +20,17 @@ class PDFHandler(FileSystemEventHandler):
         self._workspace_root = workspace_root
         self._lock = threading.Lock()
         self._timer = None  # type: ignore[assignment]
+        self._closed = False
+
+    def close(self):
+        """Cancel pending rebuilds when the owning application exits."""
+        with self._lock:
+            self._closed = True
+            timer = self._timer
+            if timer is not None:
+                timer.cancel()
+        if timer is not None and timer is not threading.current_thread():
+            timer.join()
 
     def _is_pdf(self, path: str) -> bool:
         return bool(path) and path.lower().endswith(".pdf")
@@ -31,6 +42,8 @@ class PDFHandler(FileSystemEventHandler):
             short = path
         log(f"PDF {reason}: {short}")
         with self._lock:
+            if self._closed:
+                return
             if self._timer is not None:
                 self._timer.cancel()
             self._timer = threading.Timer(self.DEBOUNCE_SECONDS, self._build_callback)

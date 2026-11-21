@@ -1,10 +1,11 @@
 from __future__ import annotations
 
 import os
+import argparse
+import signal
+from pathlib import Path
 import sys
-import time
 import subprocess
-import shutil
 import threading
 import json
 import re
@@ -15,167 +16,22 @@ from watchdog.observers import Observer
 if __package__ in (None, ""):
     sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from backend.utils import configure_stdio, log, resolve_workspace_root, safe_rel
+from backend.utils import configure_stdio, log, safe_rel
 from backend.metadata import (
     delete_paper, delete_speedread, delete_tag, list_recycle_bin, restore_recycle_item, purge_paper, purge_all_papers,
-    save_metadata, update_paper, load_metadata, atomic_write_metadata,
+    save_metadata, update_paper, load_metadata,
 )
 from backend.quick_reading import (
     generate_speedread, test_speedread_config, get_speedread_cache,
-    list_speedread_cache, write_speedread_cache, rebuild_speedread_index,
+    list_speedread_cache,
     export_speedread,
 )
 from backend.quick_reading.model_catalog import list_models
 from backend.watcher import PDFHandler
-
-WORKSPACE_ROOT = resolve_workspace_root()
-
-# Paths resolved from the workspace root.
-PDF_DIR = os.path.join(WORKSPACE_ROOT, "papers")
-BUILD_SCRIPT = os.path.join(WORKSPACE_ROOT, "build.py")
-RUNTIME_DATA_DIR = PDF_DIR
-METADATA_FILE = os.path.join(RUNTIME_DATA_DIR, "metadata.json")
-STATS_FILE = os.path.join(RUNTIME_DATA_DIR, "stats.data.json")
-LEGACY_METADATA_FILE = os.path.join(WORKSPACE_ROOT, "metadata.json")
-LEGACY_STATS_FILE = os.path.join(WORKSPACE_ROOT, "stats.data.json")
-METADATA_DEMO_FILE = os.path.join(WORKSPACE_ROOT, "metadata.demo.json")
-QUICK_READING_CACHE_DIR = os.path.join(PDF_DIR, ".quick_reading_cache")
-LEGACY_SPEEDREAD_CACHE_DIR = os.path.join(WORKSPACE_ROOT, ".speedread_cache")
-LEGACY_QUICK_READING_CACHE_DIR = os.path.join(PDF_DIR, ".cache", ".quick_reading_cache")
-
-def _move_if_missing(src: str, dst: str) -> None:
-    if os.path.exists(dst) or not os.path.exists(src):
-        return
-    try:
-        shutil.move(src, dst)
-    except Exception:
-        shutil.copy2(src, dst)
-
-
-def _merge_tree(src: str, dst: str) -> None:
-    if not os.path.isdir(src):
-        return
-    if os.path.abspath(src) == os.path.abspath(dst):
-        return
-    os.makedirs(dst, exist_ok=True)
-    for name in os.listdir(src):
-        src_path = os.path.join(src, name)
-        dst_path = os.path.join(dst, name)
-        if os.path.isdir(src_path):
-            _merge_tree(src_path, dst_path)
-            try:
-                os.rmdir(src_path)
-            except OSError:
-                pass
-            continue
-        if os.path.exists(dst_path):
-            try:
-                os.remove(src_path)
-            except OSError:
-                pass
-            continue
-        shutil.move(src_path, dst_path)
-    try:
-        os.rmdir(src)
-    except OSError:
-        pass
-
-
-def _normalize_quick_reading_image_path(image_path: str) -> str:
-    if not isinstance(image_path, str):
-        return image_path
-    normalized = image_path.replace("\\", "/")
-    prefixes = (
-        ".speedread_cache/",
-        "papers/.cache/.quick_reading_cache/",
-    )
-    for prefix in prefixes:
-        if normalized.startswith(prefix):
-            suffix = normalized[len(prefix):].lstrip("/")
-            return f"papers/.quick_reading_cache/{suffix}" if suffix else "papers/.quick_reading_cache"
-    return normalized
-
-
-def _rewrite_quick_reading_paths(speed_read: dict) -> bool:
-    changed = False
-
-    def rewrite_assets(items) -> None:
-        nonlocal changed
-        if not isinstance(items, list):
-            return
-        for item in items:
-            if not isinstance(item, dict):
-                continue
-            image_path = item.get("image_path")
-            normalized = _normalize_quick_reading_image_path(image_path)
-            if normalized != image_path:
-                item["image_path"] = normalized
-                changed = True
-
-    rewrite_assets(speed_read.get("candidate_pages"))
-    content = speed_read.get("content")
-    if isinstance(content, dict):
-        rewrite_assets(content.get("core_figures"))
-        rewrite_assets(content.get("figure_insights"))
-    return changed
-
-
-def _bootstrap_runtime_data_files() -> None:
-    os.makedirs(RUNTIME_DATA_DIR, exist_ok=True)
-    _move_if_missing(LEGACY_METADATA_FILE, METADATA_FILE)
-    _move_if_missing(LEGACY_STATS_FILE, STATS_FILE)
-    if not os.path.exists(METADATA_FILE) and os.path.exists(METADATA_DEMO_FILE):
-        shutil.copy2(METADATA_DEMO_FILE, METADATA_FILE)
-
-
-def _bootstrap_quick_reading_cache() -> None:
-    _merge_tree(LEGACY_SPEEDREAD_CACHE_DIR, QUICK_READING_CACHE_DIR)
-    _merge_tree(LEGACY_QUICK_READING_CACHE_DIR, QUICK_READING_CACHE_DIR)
-
-    try:
-        metadata = load_metadata(METADATA_FILE)
-    except Exception as exc:
-        log(f"读取速读缓存元数据失败: {exc}")
-        return
-
-    changed = False
-    for file_key, entry in metadata.items():
-        if not isinstance(entry, dict):
-            continue
-        if "speed_read" not in entry:
-            continue
-        speed_read = entry.pop("speed_read", None)
-        if isinstance(speed_read, dict):
-            _rewrite_quick_reading_paths(speed_read)
-            try:
-                write_speedread_cache(file_key, speed_read, WORKSPACE_ROOT, QUICK_READING_CACHE_DIR)
-            except Exception as exc:
-                log(f"迁移速读缓存失败 {file_key}: {exc}")
-        changed = True
-
-    if not changed:
-        try:
-            rebuild_speedread_index(list(metadata), WORKSPACE_ROOT, QUICK_READING_CACHE_DIR)
-        except Exception as exc:
-            log(f"重建速读缓存索引失败: {exc}")
-        return
-
-    try:
-        atomic_write_metadata(metadata, METADATA_FILE)
-    except Exception as exc:
-        log(f"写回速读缓存元数据失败: {exc}")
-    try:
-        rebuild_speedread_index(list(metadata), WORKSPACE_ROOT, QUICK_READING_CACHE_DIR)
-    except Exception as exc:
-        log(f"重建速读缓存索引失败: {exc}")
-
-
-_bootstrap_runtime_data_files()
-_bootstrap_quick_reading_cache()
-
-RECYCLE_DIR = os.path.join(WORKSPACE_ROOT, ".recycle_bin")
-LOG_FILE = os.path.join(WORKSPACE_ROOT, "watchdog.log")
-LEGACY_LOG_FILE = os.path.join(WORKSPACE_ROOT, "waatchdog.log")
+from backend.runtime.paths import RuntimePaths
+from backend.runtime.files import public_file
+from backend.runtime.bootstrap import bootstrap
+from backend.library.scanner import scan_library
 
 HTTP_PORT = 8000
 SPEEDREAD_MAX_IMAGE_PAGES = 5
@@ -183,12 +39,12 @@ SPEEDREAD_IMAGE_WIDTH = 3200
 SPEEDREAD_MAX_SOURCE_CHARS = 24000
 
 
-def _resolve_log_file() -> str:
-    if os.path.exists(LOG_FILE):
-        return LOG_FILE
-    if os.path.exists(LEGACY_LOG_FILE):
-        return LEGACY_LOG_FILE
-    return LOG_FILE
+def _resolve_log_file(paths):
+    if os.path.exists(paths.log_file):
+        return paths.log_file
+    if os.path.exists(paths.legacy_log_file):
+        return paths.legacy_log_file
+    return paths.log_file
 
 
 def _bring_explorer_to_front(target_path: str) -> None:
@@ -251,6 +107,25 @@ def _bring_explorer_to_front(target_path: str) -> None:
 class PaperRequestHandler(SimpleHTTPRequestHandler):
     """Static file handler with extra local management APIs."""
 
+    @property
+    def runtime(self):
+        return self.server.runtime
+
+    def translate_path(self, path):
+        # send_head checks authorization before this method is called.
+        return public_file(self.runtime, path) or str(Path(self.runtime.resource_root) / ".denied")
+
+    def send_head(self):
+        target = public_file(self.runtime, self.path)
+        if target is None or not os.path.isfile(target):
+            self.send_error(404, "Not found")
+            return None
+        return super().send_head()
+
+    def list_directory(self, path):
+        self.send_error(403, "Directory listing is disabled")
+        return None
+
     def _send_json(self, status, payload):
         body = json.dumps(payload, ensure_ascii=False).encode("utf-8")
         self.send_response(status)
@@ -291,8 +166,12 @@ class PaperRequestHandler(SimpleHTTPRequestHandler):
         if parsed.path == "/api/quick-reading/export":
             self.handle_speedread_export(parse_qs(parsed.query))
             return
+        if parsed.path == "/api/library":
+            metadata = load_metadata(self.runtime.metadata)
+            self._send_json(200, {"ok": True, "papers": list(metadata.values())})
+            return
         if parsed.path == "/api/ping":
-            self._send_json(200, {"ok": True, "service": "watchdog"})
+            self._send_json(200, {"ok": True, "service": "watchdog", "api_version": 1})
             return
         super().do_GET()
 
@@ -353,58 +232,58 @@ class PaperRequestHandler(SimpleHTTPRequestHandler):
     # ------- recycle bin -------
     def handle_delete_paper(self, payload):
         file_key = (payload.get("file_key") or "").strip()
-        result = delete_paper(file_key, WORKSPACE_ROOT, METADATA_FILE, RECYCLE_DIR)
+        result = delete_paper(file_key, self.runtime.library_root, self.runtime.metadata, self.runtime.recycle)
         self._send_json(result.status, result.payload)
 
     def handle_delete_speedread(self, payload):
         file_key = (payload.get("file_key") or "").strip()
-        result = delete_speedread(file_key, WORKSPACE_ROOT, METADATA_FILE, QUICK_READING_CACHE_DIR, RECYCLE_DIR)
+        result = delete_speedread(file_key, self.runtime.library_root, self.runtime.metadata, self.runtime.speedreads, self.runtime.recycle)
         self._send_json(result.status, result.payload)
 
     def handle_recycle_list(self):
-        result = list_recycle_bin(RECYCLE_DIR)
+        result = list_recycle_bin(self.runtime.recycle)
         self._send_json(result.status, result.payload)
 
     def handle_delete_tag(self, payload):
-        result = delete_tag(payload.get("tag"), WORKSPACE_ROOT, METADATA_FILE, RECYCLE_DIR)
+        result = delete_tag(payload.get("tag"), self.runtime.library_root, self.runtime.metadata, self.runtime.recycle)
         self._send_json(result.status, result.payload)
 
     def handle_recycle_restore(self, payload):
         rid = payload.get("id")
-        result = restore_recycle_item(rid, WORKSPACE_ROOT, BUILD_SCRIPT, METADATA_FILE, RECYCLE_DIR, QUICK_READING_CACHE_DIR)
+        result = restore_recycle_item(rid, self.runtime.library_root, self.runtime.build_script, self.runtime.metadata, self.runtime.recycle, self.runtime.speedreads)
         self._send_json(result.status, result.payload)
 
     def handle_recycle_purge(self, payload):
         rid = payload.get("id")
-        result = purge_paper(rid, RECYCLE_DIR)
+        result = purge_paper(rid, self.runtime.recycle)
         self._send_json(result.status, result.payload)
 
     def handle_recycle_purge_all(self):
-        result = purge_all_papers(RECYCLE_DIR)
+        result = purge_all_papers(self.runtime.recycle)
         self._send_json(result.status, result.payload)
 
     # ------- metadata persistence -------
     def handle_save_metadata(self, payload):
         data = payload.get("data")
-        result = save_metadata(data, METADATA_FILE)
+        result = save_metadata(data, self.runtime.metadata)
         self._send_json(result.status, result.payload)
 
     def handle_update_paper(self, payload):
         file_key = (payload.get("file_key") or "").strip()
         fields = payload.get("fields")
-        result = update_paper(file_key, fields, METADATA_FILE)
+        result = update_paper(file_key, fields, self.runtime.metadata)
         self._send_json(result.status, result.payload)
 
     # ------- paper speed-read -------
     # ------- paper speed-read -------
     def handle_speedread_cache(self, query):
         file_key = (query.get("file_key") or [""])[0].strip()
-        result = get_speedread_cache(file_key, WORKSPACE_ROOT, QUICK_READING_CACHE_DIR)
+        result = get_speedread_cache(file_key, self.runtime.library_root, self.runtime.speedreads)
         self._send_json(result.status, result.payload)
 
     def handle_list_speedread_cache(self, payload):
         file_keys = payload.get("file_keys") or []
-        result = list_speedread_cache(file_keys, WORKSPACE_ROOT, QUICK_READING_CACHE_DIR)
+        result = list_speedread_cache(file_keys, self.runtime.library_root, self.runtime.speedreads)
         self._send_json(result.status, result.payload)
 
     def handle_generate_speedread(self, payload):
@@ -414,7 +293,7 @@ class PaperRequestHandler(SimpleHTTPRequestHandler):
         force = bool(payload.get("force"))
         result = generate_speedread(
             file_key, api_config, force,
-            WORKSPACE_ROOT, METADATA_FILE, QUICK_READING_CACHE_DIR,
+            self.runtime.library_root, self.runtime.metadata, self.runtime.speedreads,
             SPEEDREAD_MAX_IMAGE_PAGES, SPEEDREAD_IMAGE_WIDTH, SPEEDREAD_MAX_SOURCE_CHARS,
             options=options,
         )
@@ -423,7 +302,7 @@ class PaperRequestHandler(SimpleHTTPRequestHandler):
     def handle_speedread_export(self, query):
         file_key = (query.get("file_key") or [""])[0].strip()
         export_format = (query.get("format") or [""])[0].strip()
-        result = export_speedread(file_key, export_format, WORKSPACE_ROOT, METADATA_FILE, QUICK_READING_CACHE_DIR)
+        result = export_speedread(file_key, export_format, self.runtime.library_root, self.runtime.metadata, self.runtime.speedreads)
         payload = result.payload if isinstance(result.payload, dict) else {}
         if result.status == 200 and isinstance(payload.get("data"), (bytes, bytearray)):
             self._send_binary(result.status, payload["data"], payload.get("content_type"), payload.get("filename"))
@@ -432,7 +311,7 @@ class PaperRequestHandler(SimpleHTTPRequestHandler):
 
     def handle_test_speedread_config(self, payload):
         api_config = payload.get("apiConfig") or {}
-        result = test_speedread_config(api_config, WORKSPACE_ROOT)
+        result = test_speedread_config(api_config, self.runtime.library_root)
         self._send_json(result.status, result.payload)
 
     def handle_list_models(self, payload):
@@ -457,7 +336,7 @@ class PaperRequestHandler(SimpleHTTPRequestHandler):
             tail = 500
         tail = max(1, min(tail, 5000))
 
-        log_file = _resolve_log_file()
+        log_file = _resolve_log_file(self.runtime)
         if not os.path.exists(log_file):
             self._send_json(200, {"ok": True, "path": log_file, "lines": [], "truncated": False})
             return
@@ -486,13 +365,13 @@ class PaperRequestHandler(SimpleHTTPRequestHandler):
             return
 
         # Prevent path traversal outside the workspace.
-        abs_path = os.path.abspath(os.path.join(WORKSPACE_ROOT, rel_path))
-        try:
-            common = os.path.commonpath([WORKSPACE_ROOT, abs_path])
-        except ValueError:
-            common = ""
-        if common != WORKSPACE_ROOT:
-            self._send_json(403, {"ok": False, "error": "禁止访问工作区外的路径"})
+        if rel_path == "papers":
+            rel_path = "."
+        elif rel_path.startswith("papers" + os.sep):
+            rel_path = rel_path[len("papers") + 1:]
+        abs_path = safe_rel(rel_path, self.runtime.papers)
+        if not abs_path:
+            self._send_json(403, {"ok": False, "error": "禁止访问论文库外的路径"})
             return
 
         if not os.path.exists(abs_path):
@@ -572,73 +451,69 @@ class QuietThreadingHTTPServer(ThreadingHTTPServer):
             return
         super().handle_error(request, client_address)
 
-def main() -> None:
-    """Start the HTTP server and file watcher."""
+def create_server(paths, port=HTTP_PORT):
+    """Construct an isolated server. Call bootstrap/scan explicitly before serving."""
+    server = QuietThreadingHTTPServer(("127.0.0.1", port), PaperRequestHandler)
+    server.runtime = paths
+    return server
+
+
+def main(argv=None):
     configure_stdio()
-    # Serve files from the repository root regardless of launch location.
-    os.chdir(WORKSPACE_ROOT)
-
-    # Parse an optional port override: python -m backend --port 8001
-    port = HTTP_PORT
-    argv = sys.argv[1:]
-    for i, arg in enumerate(argv):
-        if arg in ("--port", "-p") and i + 1 < len(argv):
-            try:
-                port = int(argv[i + 1])
-            except ValueError:
-                print(f"无效端口: {argv[i + 1]}，使用默认 {HTTP_PORT}")
-                port = HTTP_PORT
-            break
-
-    # Start the HTTP server for static files and local APIs.
+    parser = argparse.ArgumentParser(description="OpenPaper local service")
+    parser.add_argument("--port", "-p", type=int, default=HTTP_PORT)
+    parser.add_argument("--library-root", help="User library containing papers/; defaults to the legacy repository library")
+    parser.add_argument("--resource-root", help="Read-only legacy frontend assets")
+    parser.add_argument("--ready-json", action="store_true", help="Emit a JSON readiness event for a future desktop host")
+    args = parser.parse_args(argv)
+    if not 0 <= args.port <= 65535:
+        parser.error("port must be between 0 and 65535")
+    paths = RuntimePaths.resolve(args.library_root, args.resource_root)
     try:
-        httpd = QuietThreadingHTTPServer(("127.0.0.1", port), PaperRequestHandler)
+        httpd = create_server(paths, args.port)
     except OSError as exc:
-        print(f"无法绑定 127.0.0.1:{port}: {exc}")
-        if getattr(exc, "winerror", None) == 10048 or "Address already in use" in str(exc):
-            print("   端口已被占用，可能是之前的 backend/server.py 仍在运行。")
-            print("   解决办法:")
-            if sys.platform == "win32":
-                print("     1) 关闭旧服务: 在 PowerShell 执行:")
-                print(f"        Get-NetTCPConnection -LocalPort {port} | Select OwningProcess")
-                print("        Stop-Process -Id <PID> -Force")
-            elif sys.platform == "darwin":
-                print("     1) 关闭旧服务: 在 Terminal 执行:")
-                print(f"        lsof -ti :{port} | xargs kill")
-            else:
-                print("     1) 关闭旧服务: 在 Terminal 执行:")
-                print(f"        fuser -k {port}/tcp")
-            print(f"     2) 或换端口启动: python -m backend --port {port + 1}")
-        sys.exit(1)
+        parser.exit(1, f"无法绑定 127.0.0.1:{args.port}: {exc}\n")
 
-    http_thread = threading.Thread(target=httpd.serve_forever, daemon=True)
-    http_thread.start()
-    log(f"HTTP 服务已启动: http://127.0.0.1:{port}")
-
-    os.makedirs(PDF_DIR, exist_ok=True)
-
-    event_handler = PDFHandler(
-        build_callback=lambda: subprocess.run([sys.executable, BUILD_SCRIPT], check=False),
-        workspace_root=WORKSPACE_ROOT,
-    )
+    stopped = threading.Event()
     observer = Observer()
-    observer.schedule(event_handler, PDF_DIR, recursive=True)
-    observer.start()
-    log(f"监控已启动: {PDF_DIR}")
-
+    serving = False
+    watching = False
+    old_signals = {}
     try:
-        while True:
-            time.sleep(1)
-    except KeyboardInterrupt:
-        observer.stop()
-        observer.join()
-        httpd.shutdown()
+        bootstrap(paths)
+        scan_library(paths.library_root)
+        handler = PDFHandler(
+            build_callback=lambda: scan_library(paths.library_root),
+            workspace_root=paths.library_root,
+        )
+        observer.schedule(handler, paths.papers, recursive=True)
+        observer.start()
+        watching = True
+        http_thread = threading.Thread(target=httpd.serve_forever, daemon=True)
+        http_thread.start()
+        serving = True
+        if threading.current_thread() is threading.main_thread():
+            for signum in (signal.SIGINT, signal.SIGTERM):
+                old_signals[signum] = signal.signal(signum, lambda *_: stopped.set())
+        port = httpd.server_address[1]
+        log(f"HTTP 服务已启动: http://127.0.0.1:{port}")
+        log(f"监控已启动: {paths.papers}")
+        if args.ready_json:
+            print(json.dumps({"event": "ready", "api_version": 1, "host": "127.0.0.1", "port": port}), flush=True)
+        stopped.wait()
+    finally:
+        if watching:
+            observer.stop()
+            observer.join()
+        if 'handler' in locals():
+            handler.close()
+        if serving:
+            httpd.shutdown()
+            http_thread.join()
         httpd.server_close()
-        log("监控和 HTTP 服务已停止")
+        for signum, previous in old_signals.items():
+            signal.signal(signum, previous)
 
 
 if __name__ == "__main__":
     main()
-
-
-

@@ -56,11 +56,10 @@ class TagRecycleTests(unittest.TestCase):
         return metadata.delete_tag(tag, str(self.root), str(self.meta_file), str(self.recycle))
 
     def restore(self, rid):
-        with patch("backend.metadata.subprocess.run"):
-            return metadata.restore_recycle_item(
-                rid, str(self.root), str(self.root / "build.py"),
-                str(self.meta_file), str(self.recycle), str(self.cache),
-            )
+        return metadata.restore_recycle_item(
+            rid, str(self.root), str(self.root / "build.py"),
+            str(self.meta_file), str(self.recycle), str(self.cache),
+        )
 
     def assert_ok(self, result):
         self.assertEqual(result.status, 200, result.payload)
@@ -155,7 +154,7 @@ class TagRecycleTests(unittest.TestCase):
             build, PDF_DIR=str(self.papers), METADATA_FILE=str(self.meta_file),
             QUICK_READING_CACHE_DIR=str(self.cache), TEMPLATE_HTML=str(template),
             OUTPUT_HTML=str(self.root / "index.html"),
-        ), patch.object(build, "rebuild_speedread_index"), patch.object(build, "configure_stdio"):
+        ), patch.object(build, "configure_stdio"):
             build.main()
         rebuilt = self.read_metadata()
         self.assertEqual(rebuilt["other/b.pdf"]["tags"], [])

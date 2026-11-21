@@ -43,3 +43,7 @@ tempCodeRunnerFile.py
 Thumbs.db
 _docs/todo.md
 /tmp
+
+# Explicit runtime migration backup/marker (legacy repository-library mode)
+.legacy-speedread-migrated-v1
+metadata.json.before-inline-migration.bak

@@ -7,8 +7,6 @@ import json
 import os
 import re
 import shutil
-import subprocess
-import sys
 from collections import namedtuple
 from datetime import datetime
 from urllib.parse import unquote
@@ -510,18 +508,12 @@ def _restore_paper_item(
     except Exception as exc:
         return _Result(500, {"ok": False, "error": f"恢复文件失败: {exc}"})
 
-    try:
-        subprocess.run([sys.executable, build_script], check=False, cwd=workspace_root)
-    except Exception as exc:
-        log(f"恢复后执行 build 失败: {exc}")
-
     saved_meta = info.get("metadata") or {}
     file_key = info.get("file_key") or saved_meta.get("file_key")
     if file_key and saved_meta:
         meta_abs = os.path.join(workspace_root, metadata_file)
         try:
-            with open(meta_abs, "r", encoding="utf-8") as f:
-                meta = json.load(f)
+            meta = load_metadata(meta_abs)
             current = meta.get(file_key) or {}
             merged = {**current, **saved_meta}
             if current.get("pdf"):
