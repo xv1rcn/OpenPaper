@@ -95,7 +95,8 @@ fn main() {
             let url = format!("{origin}/desktop/session?token={token}").parse()?;
             WebviewWindowBuilder::new(app, "main", WebviewUrl::External(url))
                 .title("OpenPaper")
-                .inner_size(1440.0, 960.0)
+                .inner_size(1100.0, 720.0)
+                .center()
                 .on_navigation(move |url| {
                     url.scheme() == "http"
                         && url.host_str() == Some("127.0.0.1")
