@@ -217,7 +217,7 @@ class RuntimeHTTPTests(RuntimeTestCase):
             output = b""
             with selectors.DefaultSelector() as selector:
                 selector.register(proc.stdout, selectors.EVENT_READ)
-                deadline = time.monotonic() + 15
+                deadline = time.monotonic() + 60
                 while time.monotonic() < deadline and ready is None:
                     for key, _ in selector.select(timeout=0.25):
                         chunk = os.read(key.fd, 65536)

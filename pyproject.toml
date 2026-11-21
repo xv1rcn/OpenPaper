@@ -3,12 +3,13 @@ name = "openpaper"
 version = "1.0.0"
 description = "A local paper management and AI speed-read tool for grad students"
 readme = "README.md"
-requires-python = ">=3.8"
+requires-python = ">=3.9"
 dependencies = [
     "watchdog>=2.0",
     "PyMuPDF>=1.24,<2",
     "python-pptx>=0.6.23",
     "Pillow>=10",
+    "keyring>=25,<26",
 ]
 
 [project.scripts]

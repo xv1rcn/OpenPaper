@@ -54,3 +54,18 @@ python3 -m venv .venv
 显式 bootstrap 才会检查旧布局。旧速读目录采用复制且不覆盖现有结果；保留原件，并写迁移标记避免下次启动重新导入已删除的结果。内嵌速读成功保存后才移除 metadata 内旧字段，修改前保留备份。
 
 浏览器 API Key 本轮不读取、不复制、不迁移。生产级配置和凭据迁移安排在 M2。
+
+## 配置服务开发
+
+`--config-root /path/to/private-config` 可隔离配置，默认路径为 macOS 的
+`~/Library/Application Support/OpenPaper`、Windows 的 `%APPDATA%/OpenPaper`、
+Linux 的 `$XDG_CONFIG_HOME/openpaper`（默认 `~/.config/openpaper`）。不要将该目录放在论文库或静态资源目录中。
+
+GET `/api/settings` 返回 `provider`、`revision`、`hasCredential`。
+POST 同一路径提交 `{provider, revision, apiKey?}`，设置 `Content-Type: application/json`
+和 `X-OpenPaper-Request: 1`。`provider` 是完整普通配置，包含 `apiBaseUrl`、`model`、
+`timeoutSec`、`contextWindow`、`maxOutputTokens`；省略 `apiKey` 表示保留已保存密钥。
+`hasCredential` 仅表示保存了引用，读取此接口不会触发钥匙串访问，也不保证钥匙串当前解锁或条目仍存在。
+
+仅一个后端进程可拥有某个配置目录。不要把 `SettingsStore.resolve()` 的返回值发送给浏览器或写入日志。
+目前旧页面和生成接口尚未接入此服务；不要据此认为浏览器中的旧密钥已经迁移。

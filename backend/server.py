@@ -3,6 +3,7 @@ from __future__ import annotations
 import os
 import argparse
 import signal
+import time
 from pathlib import Path
 import sys
 import subprocess
@@ -32,6 +33,7 @@ from backend.runtime.paths import RuntimePaths
 from backend.runtime.files import public_file
 from backend.runtime.bootstrap import bootstrap
 from backend.library.scanner import scan_library
+from backend.settings.store import SettingsStore, SettingsError, ConflictError
 
 HTTP_PORT = 8000
 SPEEDREAD_MAX_IMAGE_PAGES = 5
@@ -146,8 +148,29 @@ class PaperRequestHandler(SimpleHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(body)
 
+    def _settings_access(self, write=False):
+        expected = {f"127.0.0.1:{self.server.server_port}", f"localhost:{self.server.server_port}"}
+        host = self.headers.get("Host", "")
+        origin = self.headers.get("Origin")
+        if host not in expected or (origin is not None and origin != "http://" + host):
+            self._send_json(403, {"ok": False, "error": "不允许的请求来源"})
+            return False
+        if write and (self.headers.get_content_type() != "application/json"
+                      or self.headers.get("X-OpenPaper-Request") != "1"):
+            self._send_json(403, {"ok": False, "error": "配置写入需要本地 JSON 请求"})
+            return False
+        return True
+
     def do_GET(self):
         parsed = urlparse(self.path)
+        if parsed.path == "/api/settings":
+            if not self._settings_access():
+                return
+            try:
+                self._send_json(200, {"ok": True, **self.server.settings.read()})
+            except SettingsError as exc:
+                self._send_json(400, {"ok": False, "error": str(exc)})
+            return
         if parsed.path == "/api/open-folder":
             self.handle_open_folder(parse_qs(parsed.query))
             return
@@ -177,6 +200,24 @@ class PaperRequestHandler(SimpleHTTPRequestHandler):
 
     def do_POST(self):
         parsed = urlparse(self.path)
+        if parsed.path == "/api/settings":
+            if not self._settings_access(write=True):
+                return
+            try:
+                length = int(self.headers.get("Content-Length", "0"))
+                if not 0 < length <= 65536 or self.headers.get("Transfer-Encoding"):
+                    raise SettingsError("配置请求大小无效")
+                payload = json.loads(self.rfile.read(length))
+                if not isinstance(payload, dict) or set(payload) - {"provider", "revision", "apiKey"}:
+                    raise SettingsError("配置请求格式无效")
+                result = self.server.settings.save(payload.get("provider"), payload.get("revision"), payload.get("apiKey"))
+                self._send_json(200, {"ok": True, **result})
+            except ConflictError as exc:
+                self._send_json(409, {"ok": False, "error": str(exc)})
+            except (SettingsError, ValueError) as exc:
+                message = str(exc) if isinstance(exc, SettingsError) else "配置 JSON 格式无效"
+                self._send_json(400, {"ok": False, "error": message})
+            return
         try:
             length = int(self.headers.get("Content-Length") or 0)
         except (TypeError, ValueError):
@@ -451,10 +492,11 @@ class QuietThreadingHTTPServer(ThreadingHTTPServer):
             return
         super().handle_error(request, client_address)
 
-def create_server(paths, port=HTTP_PORT):
+def create_server(paths, port=HTTP_PORT, settings=None):
     """Construct an isolated server. Call bootstrap/scan explicitly before serving."""
     server = QuietThreadingHTTPServer(("127.0.0.1", port), PaperRequestHandler)
     server.runtime = paths
+    server.settings = settings if settings is not None else SettingsStore()
     return server
 
 
@@ -463,6 +505,7 @@ def main(argv=None):
     parser = argparse.ArgumentParser(description="OpenPaper local service")
     parser.add_argument("--port", "-p", type=int, default=HTTP_PORT)
     parser.add_argument("--library-root", help="User library containing papers/; defaults to the legacy repository library")
+    parser.add_argument("--config-root", help="Private settings directory; defaults to OS user application data")
     parser.add_argument("--resource-root", help="Read-only legacy frontend assets")
     parser.add_argument("--ready-json", action="store_true", help="Emit a JSON readiness event for a future desktop host")
     args = parser.parse_args(argv)
@@ -470,7 +513,7 @@ def main(argv=None):
         parser.error("port must be between 0 and 65535")
     paths = RuntimePaths.resolve(args.library_root, args.resource_root)
     try:
-        httpd = create_server(paths, args.port)
+        httpd = create_server(paths, args.port, SettingsStore(args.config_root))
     except OSError as exc:
         parser.exit(1, f"无法绑定 127.0.0.1:{args.port}: {exc}\n")
 
