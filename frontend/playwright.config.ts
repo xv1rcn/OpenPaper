@@ -4,6 +4,8 @@ export default defineConfig({
   testDir: "./e2e",
   workers: 1,
   use: {
+    browserName:
+      process.env.OPENPAPER_TEST_BROWSER === "webkit" ? "webkit" : "chromium",
     baseURL: "http://127.0.0.1:8765",
     viewport: { width: 1440, height: 1000 },
     screenshot: "only-on-failure",

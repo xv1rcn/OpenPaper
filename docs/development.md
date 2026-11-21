@@ -128,3 +128,11 @@ Vite 将 cmaps、standard_fonts、wasm 和许可证复制到 dist/pdfjs，开发
 ## 桌面开发
 
 运行方式及当前限制见 [desktop/README.md](../desktop/README.md)。默认独立数据目录；旧浏览器服务仍可使用 8001，不与桌面服务共用配置或目录。
+
+## 桌面滚动边界
+
+桌面书库由固定视口高度的 app-shell 承载；main-content 是纵向 flex，topbar 不收缩，library-content 独立滚动。侧栏只有 tag-navigation 可滚动，底部设置/回收站始终保留。
+
+阅读工作区以 flex 分配顶部栏之外的剩余高度，不再叠加 reader-columns 的 `100vh - 135px` 与 PDF 的 `76vh`。PDF 与速读正文独立滚动；生成选项有独立高度上限，容器设置 overscroll-behavior 阻止边缘滚动向外传播。书库 680px 以下、阅读器 800px 以下仍使用窄屏纵向布局。
+
+回归：`npm run test:e2e -- scroll.spec`，覆盖 1024×768、900×600 下内容滚动、标签滚动、固定控件位置及生成选项展开。设置 `OPENPAPER_TEST_BROWSER=webkit` 可使用已安装的 Playwright WebKit 运行相同测试。
