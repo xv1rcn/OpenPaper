@@ -26,10 +26,7 @@ test("legacy entry points open the Vue library, statistics and cached reader", a
   await expect(page).toHaveURL(/\/app\/\?file_key=fixture-0.pdf/);
   await expect(page.getByText("Cached research summary")).toBeVisible();
   await expect(page.getByText("Test takeaway")).toBeVisible();
-  await expect(page.getByTitle("PDF 原文")).toHaveAttribute(
-    "src",
-    /fixture-0.pdf#page=1/,
-  );
+  await expect(page.locator(".pdfViewer canvas").first()).toBeVisible();
   await page.getByLabel("PDF 页码").fill("2");
   await page.getByLabel("PDF 页码").press("Tab");
   await page.reload();

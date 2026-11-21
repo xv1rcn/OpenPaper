@@ -113,4 +113,14 @@ npm run test:e2e
 
 设置中的“外观”通过 `/api/preferences` 保存到配置目录的 `preferences.json`，与密钥存储分离；使用修订号避免旧页面覆盖新配置。主题在重开页面时应用。浏览器分组顺序、卡片/列表、阅读布局仍保存在 localStorage。
 
-速读使用已有 Python 缓存与生成流程；原文目前为浏览器 PDF 查看器。Tauri/WebView 的 PDF.js 替代仍待后续实现。
+速读使用已有 Python 缓存与生成流程；原文已使用本地打包的 PDF.js，支持文本选择、搜索、缩放与页码恢复；Tauri/WebView 实机验证仍待后续完成。
+
+## PDF.js 阅读组件
+
+`PdfReader.vue` 按需加载 PDF.js 6.5.438 的 viewer、worker 与样式，支持连续滚动、文本选择、搜索高亮、前后匹配、翻页、适合宽度/整页和固定缩放。页码沿用原文档的本地布局记录，缩放独立记录；当前恢复粒度是页码，不保存页内像素偏移。关闭原文面板会销毁文档任务。
+
+Vite 将 cmaps、standard_fonts、wasm 和许可证复制到 dist/pdfjs，开发服务提供对应资源；后端仅允许指定目录及扩展，继续拒绝源码和 source map。Worker 随构建输出到 assets，不需要在线 CDN。完整阅读器按需加载，当前约 617 kB JS、1.27 MB worker（未压缩传输大小），仍会产生 Vite 大块提示。
+
+扫描 PDF 无文本层时不提供 OCR。密码文件给出提示；当前不包含书签管理、手写批注或表单编辑流程。引用回跳只定位页码。
+
+参考：https://mozilla.github.io/pdf.js/examples/

@@ -207,6 +207,21 @@ class RuntimeHTTPTests(RuntimeTestCase):
             self.assertEqual(error.exception.code, 403)
             launch.assert_not_called()
 
+    def test_pdfjs_assets_are_local_and_source_files_remain_private(self):
+        root = self.resources / "frontend/dist"
+        for file in ["assets/pdf.worker.mjs", "pdfjs/cmaps/test.bcmap", "pdfjs/standard_fonts/test.ttf", "pdfjs/wasm/test.wasm"]:
+            path = root / file
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_bytes(b"fixture")
+        base = self.start_server()
+        for file in ["assets/pdf.worker.mjs", "pdfjs/cmaps/test.bcmap", "pdfjs/standard_fonts/test.ttf", "pdfjs/wasm/test.wasm"]:
+            self.assertEqual(self.read(base + "/app/" + file), b"fixture")
+        for file in ["pdfjs/wasm/source.js", "pdfjs/wasm/private.json", "assets/pdf.worker.mjs.map"]:
+            path = root / file
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text("private")
+            with self.assertRaises(HTTPError): self.read(base + "/app/" + file)
+
     def test_static_and_library_api_use_different_roots(self):
         base = self.start_server()
         self.assertIn(b"fixture", self.read(base + "/"))

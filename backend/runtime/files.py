@@ -20,7 +20,13 @@ def public_file(paths, url):
         allowed = app_parts == ["index.html"] or (
             len(app_parts) == 2 and app_parts[0] == "assets"
             and not app_parts[1].startswith(".")
-            and suffix in (".js", ".css", ".svg", ".woff", ".woff2")
+            and suffix in (".js", ".mjs", ".css", ".svg", ".woff", ".woff2")
+        )
+        allowed = allowed or (
+            len(app_parts) == 3 and app_parts[0] == "pdfjs"
+            and app_parts[1] in ("cmaps", "standard_fonts", "wasm")
+            and not app_parts[2].startswith(".")
+            and suffix in (".bcmap", ".pfb", ".ttf", ".wasm")
         )
         target = base.joinpath(*app_parts).resolve()
     elif parts[0] == "papers":

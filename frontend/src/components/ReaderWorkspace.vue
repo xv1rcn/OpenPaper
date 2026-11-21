@@ -1,6 +1,12 @@
 <script setup lang="ts">
 import NoteText from "./NoteText.vue";
-import { ref, computed, onMounted, onUnmounted } from "vue";
+import {
+  ref,
+  computed,
+  onMounted,
+  onUnmounted,
+  defineAsyncComponent,
+} from "vue";
 import { ArrowLeft, RefreshCw, Download, Settings2, Trash2 } from "@lucide/vue";
 import Button from "./ui/button/Button.vue";
 import SettingsPanel from "./SettingsPanel.vue";
@@ -14,6 +20,7 @@ import {
   type SpeedRead,
 } from "@/lib/reading";
 import type { Paper } from "@/lib/types";
+const PdfReader = defineAsyncComponent(() => import("./PdfReader.vue"));
 const props = defineProps<{ fileKey: string }>();
 const paper = ref<Paper | null>(null),
   reading = ref<SpeedRead>({}),
@@ -299,10 +306,15 @@ onUnmounted(() => {
           class="pdf-panel"
           :style="{ width: width + '%' }"
         >
-          <iframe :src="pdf + '#page=' + page" title="PDF 原文" /><a
-            :href="pdf"
-            target="_blank"
-            rel="noopener"
+          <PdfReader
+            :src="pdf"
+            :page="page"
+            :storage-key="storageKey"
+            @page="
+              page = $event;
+              saveLayout();
+            "
+          /><a :href="pdf" target="_blank" rel="noopener"
             >在独立窗口打开原始 PDF</a
           >
         </section>
