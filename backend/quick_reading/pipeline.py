@@ -277,7 +277,7 @@ def generate_speedread(
             "request_mode": "",
             "paper": paper_meta,
             "options": generation_options,
-            "error": clean_page_text(str(exc), 600),
+            "error": clean_page_text(_safe_error(exc, api_config), 600),
             "token_status": token_status,
             "progress": {
                 "stage": "error",
@@ -290,8 +290,8 @@ def generate_speedread(
             write_speedread_cache(file_key, error_state, workspace_root, quick_reading_cache_dir)
         except Exception as write_exc:
             log(f"写入速读错误状态失败: {write_exc}")
-        log(f"速读生成失败: {file_key} - {exc}")
-        return _Result(500, {"ok": False, "error": clean_page_text(str(exc), 600), "speed_read": error_state})
+        log(f"速读生成失败: {file_key} - {_safe_error(exc, api_config)}")
+        return _Result(500, {"ok": False, "error": clean_page_text(_safe_error(exc, api_config), 600), "speed_read": error_state})
 
 
 def test_speedread_config(api_config: dict, workspace_root: str) -> _Result:
@@ -320,4 +320,10 @@ def test_speedread_config(api_config: dict, workspace_root: str) -> _Result:
             "model_capabilities": capabilities,
         })
     except Exception as exc:
-        return _Result(500, {"ok": False, "error": clean_page_text(str(exc), 600)})
+        return _Result(500, {"ok": False, "error": clean_page_text(_safe_error(exc, api_config), 600)})
+
+
+def _safe_error(exc, config):
+    message = str(exc)
+    key = config.get("apiKey")
+    return message.replace(key, "[API Key 已隐藏]") if isinstance(key, str) and key else message

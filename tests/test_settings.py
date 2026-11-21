@@ -147,11 +147,11 @@ class SettingsHTTPTests(unittest.TestCase):
         self.addCleanup(self.server.shutdown)
         self.host = '127.0.0.1:' + str(self.server.server_port)
 
-    def request(self, method='GET', body=None, **headers):
+    def request(self, method='GET', body=None, path='/api/settings', **headers):
         from http.client import HTTPConnection
         connection = HTTPConnection('127.0.0.1', self.server.server_port, timeout=5)
         try:
-            connection.request(method, '/api/settings', body=body, headers=headers)
+            connection.request(method, path, body=body, headers=headers)
             response = connection.getresponse()
             return response.status, json.loads(response.read())
         finally:
@@ -176,3 +176,55 @@ class SettingsHTTPTests(unittest.TestCase):
         for body in ('[]', '{bad', 'x' * 65537):
             self.assertEqual(self.request('POST', body, **headers)[0], 400)
         self.assertFalse(self.store.path.exists())
+
+    def test_saved_credentials_cannot_be_redirected_by_client(self):
+        from types import SimpleNamespace
+        self.store.save({**DEFAULTS, 'apiBaseUrl': 'https://example.com', 'model': 'test'}, '0', 'synthetic-secret')
+        headers = {'Content-Type': 'application/json', 'X-OpenPaper-Request': '1'}
+        with patch('backend.server.test_speedread_config', return_value=SimpleNamespace(status=200, payload={'ok': True})) as call:
+            body = json.dumps({'apiConfig': {'useSaved': True}})
+            self.assertEqual(self.request('POST', body, path='/api/test-speedread-config', **headers)[0], 200)
+            self.assertEqual(call.call_args.args[0]['apiKey'], 'synthetic-secret')
+            call.reset_mock()
+            body = json.dumps({'apiConfig': {'useSaved': True, 'apiBaseUrl': 'https://evil.example'}})
+            self.assertEqual(self.request('POST', body, path='/api/test-speedread-config', **headers)[0], 400)
+            call.assert_not_called()
+            self.assertEqual(self.request('POST', '{}', path='/api/test-speedread-config')[0], 403)
+
+    def test_reset_deletes_credential_and_persists(self):
+        before = self.store.save(DEFAULTS, '0', 'synthetic-secret')
+        data = self.store.reset(before['revision'])
+        self.assertFalse(data['hasCredential'])
+        self.assertEqual(self.store.vault.values, {})
+        self.assertFalse(SettingsStore(self.temp.name, self.store.vault).read()['hasCredential'])
+
+    def test_provider_error_redacts_secret(self):
+        from backend.quick_reading.pipeline import test_speedread_config
+        with patch('backend.quick_reading.pipeline._read_model_capabilities', side_effect=RuntimeError('provider echoed synthetic-secret')):
+            result = test_speedread_config({'apiKey': 'synthetic-secret'}, self.temp.name)
+        self.assertNotIn('synthetic-secret', json.dumps(result.payload))
+
+    def test_generation_and_model_list_use_saved_config(self):
+        from types import SimpleNamespace
+        self.store.save({**DEFAULTS, 'apiBaseUrl': 'https://example.com', 'model': 'test'}, '0', 'synthetic-secret')
+        headers = {'Content-Type': 'application/json', 'X-OpenPaper-Request': '1'}
+        for path, target, result in (
+            ('/api/generate-speedread', 'backend.server.generate_speedread', SimpleNamespace(status=200, payload={'ok': True})),
+            ('/api/quick-reading/generate', 'backend.server.generate_speedread', SimpleNamespace(status=200, payload={'ok': True})),
+            ('/api/list-models', 'backend.server.list_models', {'ok': True, 'models': []}),
+        ):
+            with self.subTest(path=path), patch(target, return_value=result) as call:
+                status, response = self.request('POST', json.dumps({'file_key': 'test.pdf', 'apiConfig': {'useSaved': True}}), path=path, **headers)
+                self.assertEqual(status, 200)
+                self.assertNotIn('synthetic-secret', json.dumps(response))
+                args = call.call_args.args
+                config = args[0] if path == '/api/list-models' else args[1]
+                self.assertEqual(config['apiKey'], 'synthetic-secret')
+
+    def test_client_logs_redact_key_before_truncation(self):
+        from backend.quick_reading.llm_client import OpenAICompatibleClient
+        client = object.__new__(OpenAICompatibleClient)
+        client.api_key = 'synthetic-secret'
+        with patch('backend.quick_reading.llm_client.log') as logged:
+            client._log('provider echoed synthetic-secret')
+        self.assertNotIn('synthetic-secret', logged.call_args.args[0])

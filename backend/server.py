@@ -208,9 +208,10 @@ class PaperRequestHandler(SimpleHTTPRequestHandler):
                 if not 0 < length <= 65536 or self.headers.get("Transfer-Encoding"):
                     raise SettingsError("配置请求大小无效")
                 payload = json.loads(self.rfile.read(length))
-                if not isinstance(payload, dict) or set(payload) - {"provider", "revision", "apiKey"}:
+                if not isinstance(payload, dict) or set(payload) - {"provider", "revision", "apiKey", "reset"}:
                     raise SettingsError("配置请求格式无效")
-                result = self.server.settings.save(payload.get("provider"), payload.get("revision"), payload.get("apiKey"))
+                result = (self.server.settings.reset(payload.get("revision")) if payload.get("reset") is True
+                          else self.server.settings.save(payload.get("provider"), payload.get("revision"), payload.get("apiKey")))
                 self._send_json(200, {"ok": True, **result})
             except ConflictError as exc:
                 self._send_json(409, {"ok": False, "error": str(exc)})
@@ -218,10 +219,17 @@ class PaperRequestHandler(SimpleHTTPRequestHandler):
                 message = str(exc) if isinstance(exc, SettingsError) else "配置 JSON 格式无效"
                 self._send_json(400, {"ok": False, "error": message})
             return
+        protected = parsed.path in ("/api/list-models", "/api/test-speedread-config",
+                                    "/api/generate-speedread", "/api/quick-reading/generate")
+        if protected and not self._settings_access(write=True):
+            return
         try:
             length = int(self.headers.get("Content-Length") or 0)
         except (TypeError, ValueError):
             length = 0
+        if length < 0 or length > 1048576 or self.headers.get("Transfer-Encoding"):
+            self._send_json(413, {"ok": False, "error": "请求大小无效"})
+            return
         body = self.rfile.read(length) if length > 0 else b""
         try:
             payload = json.loads(body.decode("utf-8")) if body else {}
@@ -229,6 +237,17 @@ class PaperRequestHandler(SimpleHTTPRequestHandler):
             self._send_json(400, {"ok": False, "error": "JSON 解析失败"})
             return
 
+        if not isinstance(payload, dict):
+            self._send_json(400, {"ok": False, "error": "请求必须是 JSON 对象"})
+            return
+        if protected:
+            try:
+                if payload.get("apiConfig") != {"useSaved": True}:
+                    raise SettingsError("请刷新页面并使用已保存的后端配置")
+                payload["apiConfig"] = self.server.settings.resolve()
+            except SettingsError as exc:
+                self._send_json(400, {"ok": False, "error": str(exc)})
+                return
         if parsed.path == "/api/delete-paper":
             self.handle_delete_paper(payload)
             return

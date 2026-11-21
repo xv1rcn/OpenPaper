@@ -64,7 +64,7 @@ def default_config_root():
 
 
 DEFAULTS = {"apiBaseUrl": "", "model": "", "timeoutSec": 120,
-            "contextWindow": 128000, "maxOutputTokens": 8192}
+            "contextWindow": 0, "maxOutputTokens": 0}
 
 
 def validate(values):
@@ -90,7 +90,7 @@ def validate(values):
         result["apiBaseUrl"] = url.rstrip("/")
     for field, ceiling in (("timeoutSec", 3600), ("contextWindow", 10000000), ("maxOutputTokens", 1000000)):
         value = result[field]
-        if type(value) is not int or not 1 <= value <= ceiling:
+        if type(value) is not int or not (1 if field == "timeoutSec" else 0) <= value <= ceiling:
             raise SettingsError("数值配置超出范围: " + field)
     return result
 
@@ -172,6 +172,25 @@ class SettingsStore:
                     self.vault.delete(old["credentialRef"])
                 except Exception:
                     result["warning"] = "新配置已保存，但旧凭据未能清理"
+            return result
+
+    def reset(self, revision):
+        with self.lock:
+            old = self._read()
+            if revision != old["revision"]:
+                raise ConflictError("配置已被修改，请重新加载")
+            data = {"schemaVersion": 1, "revision": uuid4().hex,
+                    "provider": dict(DEFAULTS), "credentialRef": None}
+            try:
+                self._write(data)
+            except Exception:
+                raise SettingsError("清空失败；旧配置仍然有效") from None
+            result = self._public(data)
+            if old["credentialRef"]:
+                try:
+                    self.vault.delete(old["credentialRef"])
+                except Exception:
+                    result["warning"] = "配置已清空，但系统凭据库中的旧条目未能删除"
             return result
 
     def resolve(self):

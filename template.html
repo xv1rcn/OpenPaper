@@ -430,7 +430,7 @@ button.toggle-on:hover { background:var(--accent-color-hover); }
                     <div class="ai-settings-block">
                         <label for="ai-api-key">API Key</label>
                         <input type="password" id="ai-api-key" placeholder="sk-... 或 其他格式的 key">
-                        <div class="ai-settings-tip">仅保存在当前浏览器，不会写入 papers/metadata.json。</div>
+                        <div class="ai-settings-tip">保存后存入系统凭据库，不会写入浏览器存储或论文元数据。</div>
                     </div>
                     <div class="ai-settings-block">
                         <label for="ai-model">模型名称</label>
@@ -461,9 +461,12 @@ button.toggle-on:hover { background:var(--accent-color-hover); }
                     </div>
                 </div>
                 <div style="margin-top:14px; display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
+                    <button type="button" id="ai-save">保存配置</button>
+                    <button type="button" id="ai-import">导入旧浏览器配置</button>
+                    <button type="button" id="ai-reload">重新加载</button>
                     <button type="button" id="ai-test">测试接口</button>
                     <button type="button" id="ai-reset">清空速读配置</button>
-                    <span class="settings-hint">需要通过 backend/server.py 启动本地服务。读取列表失败时仍可手动填写模型名。</span>
+                    <span class="settings-hint">配置保存在本机，密钥保存在系统凭据库。编辑后请保存；密钥留空表示不更换。</span>
                 </div>
                 <div id="ai-settings-feedback" class="ai-settings-feedback" role="status" aria-live="polite"></div>
             </div>
@@ -560,6 +563,7 @@ button.toggle-on:hover { background:var(--accent-color-hover); }
 
 <div id="papers" class="groups"></div>
 
+<script src="assets/settings-client.js"></script>
 <script src="assets/quick-reading-common.js?v=figure-normalize-crop-v2"></script>
 <script>
 const EMBEDDED_PAPERS = [];
@@ -840,7 +844,7 @@ function isSameTheme(a, b) {
 let currentTheme = loadTheme();
 applyTheme();
 
-// ===== 速读配置（仅本地浏览器持久化） =====
+// ===== 速读配置（后端持久化，浏览器仅保留编辑草稿） =====
 const SPEEDREAD_CONFIG_KEY = 'papers-visualizer-speedread-config-v1';
 const SPEEDREAD_MODELS_KEY = 'papers-visualizer-speedread-models-v1';
 const SPEEDREAD_CACHE_VERSION = 3;
@@ -860,19 +864,15 @@ const defaultSpeedReadConfig = {
     contextWindow: 0,
     maxOutputTokens: 0,
 };
-function loadSpeedReadConfig() {
-    try {
-        const raw = localStorage.getItem(SPEEDREAD_CONFIG_KEY);
-        if (!raw) return { ...defaultSpeedReadConfig };
-        return { ...defaultSpeedReadConfig, ...JSON.parse(raw) };
-    } catch (_) {
-        return { ...defaultSpeedReadConfig };
-    }
+let currentSpeedReadConfig = { ...defaultSpeedReadConfig };
+let savedSettings = null;
+let settingsDirty = false;
+async function refreshSavedSettings() {
+    const data = await OpenPaperSettings.load();
+    savedSettings = data;
+    if (!settingsDirty) currentSpeedReadConfig = { ...data.provider, apiKey: '' };
+    return data;
 }
-function saveSpeedReadConfig() {
-    try { localStorage.setItem(SPEEDREAD_CONFIG_KEY, JSON.stringify(currentSpeedReadConfig)); } catch (_) {}
-}
-let currentSpeedReadConfig = loadSpeedReadConfig();
 function speedReadEndpointKey(baseUrl) {
     return String(baseUrl || '').trim().replace(/\/+$/, '').replace(/\/(?:chat\/completions|responses|models)$/, '');
 }
@@ -1016,7 +1016,7 @@ async function loadSpeedReadCacheStates() {
     try {
         const response = await fetch('/api/list-speedread-cache', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: OpenPaperSettings.headers,
             body: JSON.stringify({ file_keys: papers.map(item => item.file_key) }),
         });
         const data = await response.json().catch(() => ({}));
@@ -1030,24 +1030,16 @@ async function loadSpeedReadCacheStates() {
     } catch (_) {}
 }
 
-function getSpeedReadConfigForRequest() {
-    const apiBaseUrl = (currentSpeedReadConfig.apiBaseUrl || '').trim();
-    const apiKey = (currentSpeedReadConfig.apiKey || '').trim();
-    const model = (currentSpeedReadConfig.model || '').trim();
-    const timeoutSec = Number(currentSpeedReadConfig.timeoutSec || 180);
-    if (!apiBaseUrl || !apiKey || !model) {
-        showStatus('请先在“设置 → ⚡ 速读”中填写 API 地址、Key 和模型名称。', true);
+async function getSpeedReadConfigForRequest(requireModel = true) {
+    try {
+        if (settingsDirty) throw new Error('配置有未保存的修改，请先保存。');
+        await refreshSavedSettings();
+        return await OpenPaperSettings.savedRequest(requireModel);
+    } catch (err) {
+        showStatus(err.message, true);
         openSettingsPane('ai');
         return null;
     }
-    return {
-        apiBaseUrl,
-        apiKey,
-        model,
-        timeoutSec: Number.isFinite(timeoutSec) ? timeoutSec : 180,
-        contextWindow: speedReadPositiveInteger(currentSpeedReadConfig.contextWindow),
-        maxOutputTokens: speedReadPositiveInteger(currentSpeedReadConfig.maxOutputTokens),
-    };
 }
 
 function defaultSpeedReadGenerateOptions() {
@@ -2114,7 +2106,7 @@ async function generateSpeedRead(key, { force = false, openAfterSuccess = true, 
         showStatus('速读生成依赖 backend/server.py 本地服务；请先启动本地服务后刷新页面。', true);
         return;
     }
-    const apiConfig = getSpeedReadConfigForRequest();
+    const apiConfig = await getSpeedReadConfigForRequest();
     if (!apiConfig) return;
 
     const requestOptions = normalizeSpeedReadGenerateOptions(options || {});
@@ -2127,7 +2119,7 @@ async function generateSpeedRead(key, { force = false, openAfterSuccess = true, 
         status: 'running',
         updated_at: new Date().toISOString(),
         error: '',
-        model: apiConfig.model,
+        model: currentSpeedReadConfig.model,
         options: requestOptions,
         progress: {
             stage: 'queued',
@@ -2148,7 +2140,7 @@ async function generateSpeedRead(key, { force = false, openAfterSuccess = true, 
     try {
         const response = await fetch('/api/generate-speedread', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: OpenPaperSettings.headers,
             body: JSON.stringify({
                 file_key: key,
                 force,
@@ -2212,7 +2204,7 @@ async function handleDeleteSpeedRead(key = activeSpeedReadKey) {
     try {
         const response = await fetch('/api/delete-speedread', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: OpenPaperSettings.headers,
             body: JSON.stringify({ file_key: key }),
         });
         const data = await response.json().catch(() => ({}));
@@ -2648,7 +2640,7 @@ async function persistMetadata({ auto }) {
         try {
             const resp = await fetch('/api/save-metadata', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: OpenPaperSettings.headers,
                 body: JSON.stringify({ data: cleanMetadata }),
             });
             if (resp.ok) {
@@ -2926,7 +2918,7 @@ function initSettingsModal() {
             contextWindow: speedReadPositiveInteger(aiContextWindowInput.value),
             maxOutputTokens: speedReadPositiveInteger(aiMaxOutputInput.value),
         };
-        saveSpeedReadConfig();
+
         if (catalogChanged) renderModelList();
     }
 
@@ -2997,6 +2989,7 @@ function initSettingsModal() {
     function syncAiInputs() {
         aiApiBaseInput.value = currentSpeedReadConfig.apiBaseUrl || '';
         aiApiKeyInput.value = currentSpeedReadConfig.apiKey || '';
+        aiApiKeyInput.placeholder = savedSettings?.hasCredential ? '已保存；留空不更换' : '输入 API Key';
         aiModelInput.value = currentSpeedReadConfig.model || '';
         aiTimeoutInput.value = currentSpeedReadConfig.timeoutSec || 180;
         aiContextWindowInput.value = speedReadPositiveInteger(currentSpeedReadConfig.contextWindow) || '';
@@ -3021,6 +3014,7 @@ function initSettingsModal() {
     function openModal(tab = 'appearance') {
         syncInputs();
         syncAiInputs();
+        if (!settingsDirty && !settingsBusy) changeSettings(() => OpenPaperSettings.load());
         activateTab(tab);
         modal.classList.add('open');
     }
@@ -3077,21 +3071,57 @@ function initSettingsModal() {
             }
             if ((key === 'apiBaseUrl' || key === 'apiKey') && catalogAbortController) catalogAbortController.abort();
             collectAiInputs();
+            settingsDirty = true;
             renderModelList();
-            setAiFeedback('');
+            setAiFeedback('有未保存的修改。');
         });
     });
 
+    let settingsBusy = false;
+    async function changeSettings(action) {
+        if (settingsBusy) return;
+        settingsBusy = true;
+        const controls = modal.querySelectorAll('[data-pane="ai"] input, [data-pane="ai"] button, [data-pane="ai"] select');
+        const disabled = Array.from(controls, control => control.disabled);
+        controls.forEach(control => { control.disabled = true; });
+        try {
+            const data = await action();
+            savedSettings = data;
+            currentSpeedReadConfig = { ...data.provider, apiKey: '' };
+            settingsDirty = false;
+            aiSettingsRevision++;
+            syncAiInputs();
+            setAiFeedback(data.warning || '配置已更新；密钥不会返回浏览器。');
+        } catch (err) {
+            setAiFeedback(err.message + '；修改仍保留，可重试。冲突时请重新加载。', true);
+        } finally {
+            controls.forEach((control, i) => { control.disabled = disabled[i]; });
+            settingsBusy = false;
+        }
+    }
+    document.getElementById('ai-save').addEventListener('click', () => changeSettings(async () => {
+        collectAiInputs();
+        if (!savedSettings) throw new Error('请先重新加载配置');
+        const { apiKey, ...provider } = currentSpeedReadConfig;
+        return OpenPaperSettings.save({ revision: savedSettings.revision, provider, ...(apiKey ? {apiKey} : {}) });
+    }));
+    document.getElementById('ai-import').addEventListener('click', () => {
+        if (!confirm('将旧浏览器配置导入系统存储，成功后删除浏览器中的旧密钥。继续吗？')) return;
+        changeSettings(async () => {
+            if (!savedSettings) throw new Error('请先重新加载配置');
+            return OpenPaperSettings.importLegacy(savedSettings.revision);
+        });
+    });
+    document.getElementById('ai-reload').addEventListener('click', () => {
+        if (settingsDirty && !confirm('放弃未保存的修改并重新加载？')) return;
+        changeSettings(() => OpenPaperSettings.load());
+    });
     aiResetBtn.addEventListener('click', () => {
-        aiSettingsRevision++;
-        if (catalogAbortController) catalogAbortController.abort();
-        currentSpeedReadConfig = { ...defaultSpeedReadConfig };
-        currentSpeedReadModelCatalog = null;
-        try { localStorage.removeItem(SPEEDREAD_MODELS_KEY); } catch (_) {}
-        aiModelSearchInput.value = '';
-        saveSpeedReadConfig();
-        syncAiInputs();
-        setAiFeedback('速读配置已清空。');
+        if (!confirm('清空已保存的速读配置并删除系统凭据？')) return;
+        changeSettings(async () => {
+            if (!savedSettings) throw new Error('请先重新加载配置');
+            return OpenPaperSettings.save({ revision: savedSettings.revision, reset: true });
+        });
     });
 
     aiModelSearchInput.addEventListener('input', renderModelList);
@@ -3102,7 +3132,8 @@ function initSettingsModal() {
             aiSettingsRevision++;
             collectAiInputs();
             renderModelCapabilities();
-            setAiFeedback('模型已选中；上下文和输出预算将自动配置。');
+            settingsDirty = true;
+            setAiFeedback('模型已选中，请保存配置。');
         }
     });
 
@@ -3118,7 +3149,8 @@ function initSettingsModal() {
         }
         const revision = aiSettingsRevision;
         const endpointKey = speedReadEndpointKey(currentSpeedReadConfig.apiBaseUrl);
-        const apiConfig = { ...currentSpeedReadConfig };
+        const apiConfig = await getSpeedReadConfigForRequest(false);
+        if (!apiConfig) return;
         const controller = new AbortController();
         catalogAbortController = controller;
         const timeout = setTimeout(() => controller.abort(), 45000);
@@ -3128,12 +3160,12 @@ function initSettingsModal() {
         try {
             const response = await fetch('/api/list-models', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: OpenPaperSettings.headers,
                 body: JSON.stringify({ apiConfig, force: true }),
                 signal: controller.signal,
             });
             const data = await response.json().catch(() => ({}));
-            if (revision !== aiSettingsRevision || apiConfig.apiKey !== aiApiKeyInput.value.trim() || endpointKey !== speedReadEndpointKey(aiApiBaseInput.value)) return;
+            if (revision !== aiSettingsRevision || endpointKey !== speedReadEndpointKey(aiApiBaseInput.value)) return;
             if (!response.ok || !data.ok) throw new Error(data.error || `HTTP ${response.status}`);
             if (!Array.isArray(data.models)) throw new Error('接口未返回模型列表');
             currentSpeedReadModelCatalog = { endpointKey, models: data.models };
@@ -3158,7 +3190,7 @@ function initSettingsModal() {
             setAiFeedback('接口测试依赖 backend/server.py 本地服务；请先启动本地服务后刷新页面。', true);
             return;
         }
-        const apiConfig = getSpeedReadConfigForRequest();
+        const apiConfig = await getSpeedReadConfigForRequest();
         if (!apiConfig) {
             setAiFeedback('请填写 API 地址、Key 和模型名称。', true);
             return;
@@ -3171,7 +3203,7 @@ function initSettingsModal() {
         try {
             const response = await fetch('/api/test-speedread-config', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: OpenPaperSettings.headers,
                 body: JSON.stringify({ apiConfig }),
             });
             const data = await response.json().catch(() => ({}));
@@ -3406,7 +3438,7 @@ async function handleDeleteTag(tag) {
     try {
         const r = await fetch('/api/delete-tag', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: OpenPaperSettings.headers,
             body: JSON.stringify({ tag }),
         });
         const data = await r.json().catch(() => ({}));
@@ -3480,7 +3512,7 @@ async function handleDeletePaper(fileKey) {
     try {
         const r = await fetch('/api/delete-paper', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: OpenPaperSettings.headers,
             body: JSON.stringify({ file_key: fileKey }),
         });
         const data = await r.json().catch(() => ({}));
@@ -3571,7 +3603,7 @@ async function recycleRestore(id, itemType = 'paper') {
     try {
         const r = await fetch('/api/recycle-restore', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: OpenPaperSettings.headers,
             body: JSON.stringify({ id }),
         });
         const data = await r.json().catch(() => ({}));
@@ -3600,7 +3632,7 @@ async function recyclePurge(id, itemType = 'paper') {
     try {
         const r = await fetch('/api/recycle-purge', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: OpenPaperSettings.headers,
             body: JSON.stringify({ id }),
         });
         const data = await r.json().catch(() => ({}));

@@ -197,6 +197,7 @@ h1 { margin: 0 0 8px; color: var(--strong); font-size: clamp(1.5rem, 2.5vw, 2.2r
     </div>
 </div>
 
+<script src="assets/settings-client.js"></script>
 <script src="assets/quick-reading-common.js?v=figure-normalize-crop-v2"></script>
 <script>
 const SPEEDREAD_CONFIG_KEY = 'papers-visualizer-speedread-config-v1';
@@ -302,29 +303,8 @@ window.addEventListener('storage', event => {
     if (event.key === THEME_KEY) applyTheme();
 });
 
-function loadSpeedReadConfig() {
-    try {
-        const raw = localStorage.getItem(SPEEDREAD_CONFIG_KEY);
-        return raw ? JSON.parse(raw) : {};
-    } catch (_) {
-        return {};
-    }
-}
-
-function getApiConfigForRequest() {
-    const config = loadSpeedReadConfig();
-    const apiBaseUrl = (config.apiBaseUrl || '').trim();
-    const apiKey = (config.apiKey || '').trim();
-    const model = (config.model || '').trim();
-    if (!apiBaseUrl || !apiKey || !model) {
-        throw new Error('请先回首页“设置 → 速读”填写 OpenAI-compatible API 地址、Key 和模型名称。');
-    }
-    return {
-        apiBaseUrl,
-        apiKey,
-        model,
-        timeoutSec: Number.isFinite(Number(config.timeoutSec)) ? Number(config.timeoutSec) : 180,
-    };
+async function getApiConfigForRequest() {
+    return OpenPaperSettings.savedRequest();
 }
 
 async function fetchJson(url) {
@@ -618,7 +598,7 @@ async function submitSpeedReadGenerateDialog() {
     generateError.textContent = '';
     let apiConfig;
     try {
-        apiConfig = getApiConfigForRequest();
+        apiConfig = await getApiConfigForRequest();
     } catch (err) {
         generateError.textContent = err.message || String(err);
         return;
@@ -631,7 +611,7 @@ async function submitSpeedReadGenerateDialog() {
     try {
         const response = await fetch('/api/quick-reading/generate', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: OpenPaperSettings.headers,
             body: JSON.stringify({ file_key: fileKey, force: true, apiConfig, options }),
         });
         const data = await response.json().catch(() => ({}));

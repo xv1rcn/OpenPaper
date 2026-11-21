@@ -68,4 +68,7 @@ POST 同一路径提交 `{provider, revision, apiKey?}`，设置 `Content-Type: 
 `hasCredential` 仅表示保存了引用，读取此接口不会触发钥匙串访问，也不保证钥匙串当前解锁或条目仍存在。
 
 仅一个后端进程可拥有某个配置目录。不要把 `SettingsStore.resolve()` 的返回值发送给浏览器或写入日志。
-目前旧页面和生成接口尚未接入此服务；不要据此认为浏览器中的旧密钥已经迁移。
+首页与独立阅读页已接入此服务。刷新页面后，在“设置 → 速读”显式导入旧浏览器配置；未点击导入前旧密钥仍在浏览器。
+生成、连接测试与模型列表请求仅接收 `apiConfig: {useSaved: true}`，并要求与设置写入相同的自定义请求头。
+清空配置发送 `{revision, reset: true}`；预算字段允许 0 表示自动配置。
+运行前端检查：`node --test tests/settings-client.test.cjs`。

@@ -124,6 +124,9 @@ def _should_fallback_to_text_only(message, has_image_inputs):
 
 
 class OpenAICompatibleClient:
+    def _log(self, message):
+        log(str(message).replace(self.api_key, "[API Key 已隐藏]") if self.api_key else str(message))
+
     def __init__(self, api_config, workspace_root):
         self.api_config = api_config if isinstance(api_config, dict) else {}
         self.workspace_root = workspace_root
@@ -167,7 +170,7 @@ class OpenAICompatibleClient:
             except RuntimeError as exc:
                 if not _should_fallback_to_text_only(str(exc), has_image_inputs):
                     raise
-                log("当前接口可能不支持图像输入或多模态消息，已自动降级为纯文本速读重试")
+                self._log("当前接口可能不支持图像输入或多模态消息，已自动降级为纯文本速读重试")
         return self._send_chat_request(prompt, "text-only", max_tokens)
 
     def _send_chat_request(self, user_content, request_mode, max_tokens):
@@ -191,7 +194,7 @@ class OpenAICompatibleClient:
         ):
             # DeepSeek enables thinking by default; it shares the output budget.
             payload["thinking"] = {"type": "disabled"}
-            log("DeepSeek Flash 速读使用非思考模式，优先输出完整 JSON")
+            self._log("DeepSeek Flash 速读使用非思考模式，优先输出完整 JSON")
 
         req = request.Request(
             self.endpoint,
@@ -205,28 +208,29 @@ class OpenAICompatibleClient:
             method="POST",
         )
 
-        log(f"send speed-read request: model={self.model}, mode={request_mode}, endpoint={self.endpoint}, timeout={self.timeout_sec}s")
+        self._log(f"send speed-read request: model={self.model}, mode={request_mode}, endpoint={self.endpoint}, timeout={self.timeout_sec}s")
         try:
             with self._opener.open(req, timeout=self.timeout_sec) as resp:
                 body = resp.read().decode("utf-8", errors="replace")
-                log(f"收到模型回复，长度 {len(body)}")
+                self._log(f"收到模型回复，长度 {len(body)}")
         except error.HTTPError as exc:
             detail = exc.read().decode("utf-8", errors="replace") if hasattr(exc, "read") else str(exc)
-            log(f"HTTP 错误 {exc.code}: {detail[:200]}")
+            detail = detail.replace(self.api_key, "[API Key 已隐藏]")
+            self._log(f"HTTP 错误 {exc.code}: {detail[:200]}")
             raise RuntimeError(f"模型接口返回 HTTP {exc.code}: {clean_page_text(detail, 600)}")
         except error.URLError as exc:
-            log(f"连接失败: {exc.reason}")
+            self._log(f"连接失败: {exc.reason}")
             raise RuntimeError(f"无法连接模型接口: {exc.reason}")
         except Exception as exc:
-            log(f"请求异常: {exc}")
+            self._log(f"请求异常: {exc}")
             raise RuntimeError(f"请求模型接口异常: {exc}")
 
         try:
             data = json.loads(body)
-            log("JSON 解析成功")
+            self._log("JSON 解析成功")
         except json.JSONDecodeError as exc:
-            log(f"JSON 解析失败: {exc}, 响应长度 {len(body)} 字符")
-            log(f"响应片段: {body[:500]}")
+            self._log(f"JSON 解析失败: {exc}, 响应长度 {len(body)} 字符")
+            self._log("响应片段: " + body.replace(self.api_key, "[API Key 已隐藏]")[:500])
             raise RuntimeError(f"模型接口返回了无效 JSON，可能是错误或网关问题。详情: {clean_page_text(str(exc), 300)}")
 
         choices = data.get("choices") if isinstance(data, dict) else None
@@ -239,10 +243,10 @@ class OpenAICompatibleClient:
             message = choice.get("message") or {}
             reasoning = message.get("reasoning_content") if isinstance(message, dict) else None
             if reasoning:
-                log(f"模型仅返回思考内容，未生成最终回答；结束原因: {finish_reason}")
+                self._log(f"模型仅返回思考内容，未生成最终回答；结束原因: {finish_reason}")
                 raise RuntimeError("模型仅返回思考内容，未生成最终回答；请关闭思考模式或增加输出预算后重试。")
-            log(f"模型没有生成最终回答；结束原因: {finish_reason}")
+            self._log(f"模型没有生成最终回答；结束原因: {finish_reason}")
             raise RuntimeError("模型接口返回成功，但没有生成文本内容")
 
-        log(f"提取生成文本: {len(content)} 字符")
+        self._log(f"提取生成文本: {len(content)} 字符")
         return _extract_json_block(content), request_mode, self.endpoint
