@@ -38,6 +38,19 @@ describe("library queries", () => {
       "Vision",
       "NLP",
     ]));
+  it("does not double-encode scanner document URLs", () => {
+    expect(
+      pdfUrl(
+        normalizePaper({ pdf: "papers/imported/%E8%AE%BA%E6%96%87%20a.pdf" }),
+      ),
+    ).toBe("/papers/imported/%E8%AE%BA%E6%96%87%20a.pdf");
+    expect(
+      pdfUrl(normalizePaper({ pdf: "papers/%2e%2e/secret.pdf" })),
+    ).toBeNull();
+    expect(
+      pdfUrl(normalizePaper({ pdf: "papers/sub%2fsecret.pdf" })),
+    ).toBeNull();
+  });
   it("rejects external and traversal document URLs", () => {
     for (const pdf of [
       "https://evil.example/x.pdf",

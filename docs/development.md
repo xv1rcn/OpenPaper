@@ -95,3 +95,14 @@ npm run test:e2e
 
 端到端测试从 `frontend/e2e/server.py` 启动隔离服务，使用 8765 端口和临时论文库；默认 Python 为 `../.venv/bin/python`，可通过 `OPENPAPER_TEST_PYTHON` 覆盖。不复用用户 8001 服务。
 截图保存在忽略的 `frontend/test-results/`。测试入口不属于生产静态文件白名单。
+
+## Vue 设置与导入
+
+新书库侧栏“速读设置”直接调用既有 `/api/settings`，无需转到旧首页。只有点击“测试接口”才调用模型；选择/保存配置不会进行付费模型调用。
+旧浏览器配置导入必须在原来的 origin 中操作；开发预览 5173 与实际应用 8001 的浏览器存储互相隔离。
+
+`POST /api/import-pdf` 使用原始 PDF 请求体，要求 `Content-Type: application/pdf`、`X-OpenPaper-Request: 1`，以及经过百分号编码的 `X-File-Name`。上限 50 MB；当前不接受加密 PDF。
+成功返回 `{ok, file_key, duplicate, indexed, warning?}`。`indexed: false` 表示文件已经保存、索引失败，不应当作“未保存”或删除源文件；同名同内容重试可修复索引。
+
+论文导入与 HTTP 书库修改和文件监控扫描共用进程内锁。不要运行多个后端/CLI 同时修改同一论文库；锁不是跨进程安全机制。
+浏览器自动化测试的配置凭据使用内存替身；服务商连接测试通过可控响应验证请求协议，不验证真实服务商可用性。

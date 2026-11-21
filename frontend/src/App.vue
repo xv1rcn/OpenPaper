@@ -14,6 +14,8 @@ import {
 import LibrarySidebar from "./components/LibrarySidebar.vue";
 import PaperCard from "./components/PaperCard.vue";
 import PaperEditor from "./components/PaperEditor.vue";
+import SettingsPanel from "./components/SettingsPanel.vue";
+import ImportPdf from "./components/ImportPdf.vue";
 import Button from "./components/ui/button/Button.vue";
 import { useLibrary } from "./composables/useLibrary";
 import { api } from "./lib/api";
@@ -35,6 +37,18 @@ const {
   mutate,
   navigate,
 } = useLibrary();
+const settingsOpen = ref(false),
+  importing = ref(false);
+let settingsOpener: HTMLElement | null = null;
+function openSettings() {
+  settingsOpener = document.activeElement as HTMLElement;
+  settingsOpen.value = true;
+}
+async function closeSettings() {
+  settingsOpen.value = false;
+  await nextTick();
+  settingsOpener?.focus();
+}
 const layout = ref<"grid" | "list">("grid");
 try {
   if (localStorage.getItem("openpaper-library-layout") === "list")
@@ -90,7 +104,8 @@ function keyboard(event: KeyboardEvent) {
   if (
     (event.metaKey || event.ctrlKey) &&
     event.key.toLowerCase() === "k" &&
-    !selected.value
+    !selected.value &&
+    !settingsOpen.value
   ) {
     event.preventDefault();
     searchInput.value?.focus();
@@ -112,6 +127,7 @@ onUnmounted(() => window.removeEventListener("keydown", keyboard));
       :unread="unread"
       :recycled="recycle.length"
       @navigate="navigate"
+      @settings="openSettings"
     />
     <main class="main-content">
       <header class="topbar">
@@ -122,7 +138,7 @@ onUnmounted(() => window.removeEventListener("keydown", keyboard));
           <span class="quiet-label">让阅读，成为积累。</span
           ><button
             class="icon-button"
-            :disabled="loading || busy"
+            :disabled="loading || busy || importing"
             aria-label="刷新论文库"
             @click="refresh"
           >
@@ -148,9 +164,11 @@ onUnmounted(() => window.removeEventListener("keydown", keyboard));
               }}
             </p>
           </div>
-          <span class="collection-mark" aria-hidden="true"
-            ><BookOpen :size="32" :stroke-width="1.2"
-          /></span>
+          <ImportPdf
+            :disabled="busy || loading"
+            @busy="importing = $event"
+            @complete="refresh"
+          />
         </section>
         <div v-if="notice" class="notice" role="status">
           {{ notice
@@ -162,7 +180,7 @@ onUnmounted(() => window.removeEventListener("keydown", keyboard));
           {{ error
           }}<Button
             variant="outline"
-            :disabled="loading || busy"
+            :disabled="loading || busy || importing"
             @click="refresh"
             >重试</Button
           >
@@ -227,7 +245,7 @@ onUnmounted(() => window.removeEventListener("keydown", keyboard));
               {{
                 papers.length
                   ? "试试其他关键词，或返回全部论文。"
-                  : "将 PDF 放入本地论文库的 papers 文件夹，应用会自动扫描。"
+                  : "点击“导入 PDF”添加论文，原文件会保留。"
               }}
             </p>
             <Button
@@ -248,7 +266,7 @@ onUnmounted(() => window.removeEventListener("keydown", keyboard));
               :key="paper.file_key"
               :paper="paper"
               :layout="layout"
-              :busy="busy"
+              :busy="busy || importing"
               @edit="edit"
               @toggle-read="
                 (paper) =>
@@ -292,9 +310,10 @@ onUnmounted(() => window.removeEventListener("keydown", keyboard));
         </section>
       </div>
     </main>
+    <SettingsPanel v-if="settingsOpen" @close="closeSettings" />
     <PaperEditor
       :paper="selected"
-      :busy="busy"
+      :busy="busy || importing"
       :error="error"
       @close="closeEditor"
       @save="save"

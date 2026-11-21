@@ -33,6 +33,8 @@ from backend.runtime.paths import RuntimePaths
 from backend.runtime.files import public_file
 from backend.runtime.bootstrap import bootstrap
 from backend.library.scanner import scan_library
+from backend.library.locking import library_lock
+from backend.library.importer import import_pdf, PDFImportError, MAX_PDF_BYTES
 from backend.settings.store import SettingsStore, SettingsError, ConflictError
 
 HTTP_PORT = 8000
@@ -148,16 +150,16 @@ class PaperRequestHandler(SimpleHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(body)
 
-    def _settings_access(self, write=False):
+    def _settings_access(self, write=False, content_type="application/json"):
         expected = {f"127.0.0.1:{self.server.server_port}", f"localhost:{self.server.server_port}"}
         host = self.headers.get("Host", "")
         origin = self.headers.get("Origin")
         if host not in expected or (origin is not None and origin != "http://" + host):
             self._send_json(403, {"ok": False, "error": "不允许的请求来源"})
             return False
-        if write and (self.headers.get_content_type() != "application/json"
+        if write and (self.headers.get_content_type() != content_type
                       or self.headers.get("X-OpenPaper-Request") != "1"):
-            self._send_json(403, {"ok": False, "error": "配置写入需要本地 JSON 请求"})
+            self._send_json(403, {"ok": False, "error": "写入需要合法的本地请求"})
             return False
         return True
 
@@ -200,6 +202,24 @@ class PaperRequestHandler(SimpleHTTPRequestHandler):
 
     def do_POST(self):
         parsed = urlparse(self.path)
+        if parsed.path == "/api/import-pdf":
+            if not self._settings_access(write=True, content_type="application/pdf"):
+                return
+            try:
+                length = int(self.headers.get("Content-Length", "0"))
+                if not 0 < length <= MAX_PDF_BYTES or self.headers.get("Transfer-Encoding"):
+                    self._send_json(413, {"ok": False, "error": "单个 PDF 不能超过 50 MB，且不能为空"})
+                    return
+                data = self.rfile.read(length)
+                if len(data) != length:
+                    raise PDFImportError("文件上传不完整")
+                result = import_pdf(self.runtime, unquote(self.headers.get("X-File-Name", "")), data)
+                self._send_json(200, result)
+            except ValueError as exc:
+                self._send_json(400, {"ok": False, "error": str(exc)})
+            except OSError:
+                self._send_json(500, {"ok": False, "error": "无法写入论文库，请检查目录权限或磁盘空间"})
+            return
         if parsed.path == "/api/settings":
             if not self._settings_access(write=True):
                 return
@@ -248,6 +268,15 @@ class PaperRequestHandler(SimpleHTTPRequestHandler):
             except SettingsError as exc:
                 self._send_json(400, {"ok": False, "error": str(exc)})
                 return
+        if parsed.path in {"/api/delete-paper", "/api/delete-speedread", "/api/delete-tag",
+                           "/api/recycle-restore", "/api/recycle-purge", "/api/recycle-purge-all",
+                           "/api/save-metadata", "/api/update-paper"}:
+            with library_lock(self.runtime.library_root):
+                self._dispatch_post(parsed, payload)
+        else:
+            self._dispatch_post(parsed, payload)
+
+    def _dispatch_post(self, parsed, payload):
         if parsed.path == "/api/delete-paper":
             self.handle_delete_paper(payload)
             return

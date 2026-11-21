@@ -9,7 +9,7 @@ import {
   Leaf,
 } from "@lucide/vue";
 import type { Collection } from "@/lib/types";
-import { legacyOrigin } from "@/lib/api";
+
 defineProps<{
   collection: Collection;
   tag: string;
@@ -18,7 +18,10 @@ defineProps<{
   unread: number;
   recycled: number;
 }>();
-defineEmits<{ navigate: [collection: Collection, tag?: string] }>();
+defineEmits<{
+  navigate: [collection: Collection, tag?: string];
+  settings: [];
+}>();
 </script>
 <template>
   <aside class="sidebar">
@@ -72,9 +75,9 @@ defineEmits<{ navigate: [collection: Collection, tag?: string] }>();
           @click="$emit('navigate', 'recycle')"
         >
           <Trash2 :size="17" />回收站<span>{{ recycled }}</span></button
-        ><a :href="legacyOrigin + '/'" target="_blank" rel="noopener"
-          ><Settings2 :size="17" />设置与旧版书库</a
-        >
+        ><button @click="$emit('settings')">
+          <Settings2 :size="17" />速读设置
+        </button>
       </nav>
       <div class="local-status"><span></span>本地论文库 · 无需账号</div>
     </div>

@@ -8,6 +8,7 @@ from datetime import datetime
 from backend.metadata import atomic_write_metadata
 from backend.quick_reading import rebuild_speedread_index
 from backend.utils import safe_rel
+from backend.library.locking import library_lock
 
 COMPANION_PATTERNS = [
     (r"(ase|icse|fse|issta|uist|chi|nips|icml|aaai)(?:20)?(\d{2})comp", "{conf} Companion"),
@@ -119,6 +120,11 @@ def infer_venue_and_year(filename: str):
 
 
 def scan_library(library_root, *, pdf_dir=None, metadata_file=None, cache_dir=None):
+    with library_lock(library_root):
+        return _scan_library(library_root, pdf_dir=pdf_dir, metadata_file=metadata_file, cache_dir=cache_dir)
+
+
+def _scan_library(library_root, *, pdf_dir=None, metadata_file=None, cache_dir=None):
     library_root = os.path.abspath(library_root)
     papers_path = pdf_dir or os.path.join(library_root, "papers")
     metadata_path = metadata_file or os.path.join(papers_path, "metadata.json")

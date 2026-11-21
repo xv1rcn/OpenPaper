@@ -9,6 +9,12 @@ from backend.runtime.paths import RuntimePaths
 from backend.runtime.bootstrap import bootstrap
 from backend.settings.store import SettingsStore
 
+class TestVault:
+    def __init__(self): self.values = {}
+    def get(self, key): return self.values.get(key)
+    def set(self, key, value): self.values[key] = value
+    def delete(self, key): self.values.pop(key, None)
+
 with tempfile.TemporaryDirectory(prefix="openpaper-e2e-") as temp:
     paths = RuntimePaths.resolve(temp)
     bootstrap(paths)
@@ -24,4 +30,4 @@ with tempfile.TemporaryDirectory(prefix="openpaper-e2e-") as temp:
             authors="Test Author", year=str(2024 + index), venue="RESEARCH", notes="",
             pdf="papers/" + filename, added_at=f"2026-01-0{index+1}")
     Path(paths.metadata).write_text(json.dumps(metadata), encoding="utf-8")
-    create_server(paths, 8765, SettingsStore(Path(temp) / "config")).serve_forever()
+    create_server(paths, 8765, SettingsStore(Path(temp) / "config", TestVault())).serve_forever()

@@ -1,5 +1,5 @@
 import type { Paper, RecycleItem } from "./types";
-async function request<T>(path: string, body?: unknown): Promise<T> {
+export async function request<T>(path: string, body?: unknown): Promise<T> {
   const response = await fetch(
     path,
     body === undefined
@@ -48,10 +48,24 @@ export const legacyOrigin = import.meta.env.DEV ? "http://127.0.0.1:8001" : "";
 export const readerUrl = (paper: Paper) =>
   `${legacyOrigin}/quick-reading.html?file_key=${encodeURIComponent(paper.file_key)}`;
 export function pdfUrl(paper: Paper): string | null {
-  const parts = paper.pdf.split("/");
+  const parts = paper.pdf.split("/").map((part) => {
+    try {
+      return decodeURIComponent(part);
+    } catch {
+      return part;
+    }
+  });
   if (
     parts[0] !== "papers" ||
-    parts.some((p) => !p || p === "." || p === ".." || p.includes("\\")) ||
+    parts.some(
+      (p) =>
+        !p ||
+        p === "." ||
+        p === ".." ||
+        p.includes("\\") ||
+        p.includes("/") ||
+        p.includes("\0"),
+    ) ||
     !paper.pdf.toLowerCase().endsWith(".pdf")
   )
     return null;
