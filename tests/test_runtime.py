@@ -271,6 +271,7 @@ class RuntimeHTTPTests(RuntimeTestCase):
         self.assertEqual(json.loads(self.read(second + "/api/library"))["papers"], [])
         self.assertEqual(os.getcwd(), cwd)
 
+    @unittest.skipIf(sys.platform == "win32", "Windows terminate is not POSIX SIGTERM; desktop pipe shutdown is tested separately")
     def test_cli_ready_event_and_sigterm_release_port(self):
         proc = subprocess.Popen(
             [sys.executable, "-u", "-m", "backend", "--port", "0", "--ready-json",

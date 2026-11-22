@@ -61,7 +61,7 @@ class ImportTests(unittest.TestCase):
 
     def test_symlink_directory_cannot_escape_library(self):
         with tempfile.TemporaryDirectory() as outside:
-            (Path(self.paths.papers) / 'imported').symlink_to(outside)
+            (Path(self.paths.papers) / 'imported').symlink_to(outside, target_is_directory=True)
             with self.assertRaises(PDFImportError):
                 import_pdf(self.paths, 'test.pdf', self.content)
             self.assertEqual(list(Path(outside).iterdir()), [])

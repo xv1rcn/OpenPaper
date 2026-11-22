@@ -52,7 +52,14 @@ fn main() {
                 .unwrap_or(app.path().app_data_dir()?);
             std::fs::create_dir_all(&data)?;
             let token = uuid::Uuid::new_v4().simple().to_string();
-            let mut child = Command::new(python)
+            let mut command = Command::new(python);
+            // Keep the Python helper from opening a console window on Windows.
+            #[cfg(windows)]
+            {
+                use std::os::windows::process::CommandExt;
+                command.creation_flags(0x08000000); // CREATE_NO_WINDOW
+            }
+            let mut child = command
                 .args([
                     "-m",
                     "backend",
@@ -68,6 +75,7 @@ fn main() {
                 .arg("--resource-root")
                 .arg(&root)
                 .env("OPENPAPER_DESKTOP_TOKEN", &token)
+                .env("PYTHONUTF8", "1")
                 .current_dir(&root)
                 .stdin(Stdio::piped())
                 .stdout(Stdio::piped())

@@ -25,3 +25,27 @@ cargo run
 - 外链打开、文件下载的 WebView 原生体验仍待验收。
 
 安全边界是本地单用户，不承诺抵御已控制同一用户账户的恶意进程。普通浏览器开发服务继续兼容原启动方式，只有 `--desktop` 强制桌面会话。
+
+## Windows / Linux 开发与验证
+
+三平台均需 Python 虚拟环境、Node.js 和 Rust。系统编译依赖见 [Tauri 官方前置条件](https://v2.tauri.app/start/prerequisites/)。Windows 使用 MSVC 工具链和 WebView2；Linux 需要 WebKitGTK 4.1 等系统库。Linux 密钥保存还需可用且已解锁的 Secret Service；缺失时明确报错，不降级到明文文件。
+
+在仓库根目录创建虚拟环境并安装依赖：
+
+```powershell
+# Windows PowerShell
+py -3 -m venv .venv
+.venv\Scripts\python.exe -m pip install -r requirements.txt
+```
+
+```sh
+# macOS / Linux
+python3 -m venv .venv
+.venv/bin/python -m pip install -r requirements.txt
+```
+
+随后执行本文开头的前端构建和 `cargo run`。Windows 辅助进程使用 CREATE_NO_WINDOW；三平台辅助进程均启用 Python UTF-8 模式。启动/退出回归覆盖中文和空格数据目录、动态端口就绪和父进程管道关闭清理。
+
+CI 桌面任务在 Windows、macOS、Ubuntu 24.04 上执行 `cargo build --locked`，检查编译及链接；后端任务在三平台运行 Python 3.10 / 3.12 测试。POSIX SIGTERM 测试只在 Unix 运行，Windows 的正常退出由父进程管道测试覆盖。符号链接安全测试需要 Windows 运行账户拥有创建符号链接的权限（开发者模式或相应权限）；不会为了通过测试跳过安全断言。
+
+这些检查不替代原生窗口实机验收，也不产生可分发安装包。下一阶段依次完成：Python 冻结与资源打包、脱离源码目录启动、安装卸载验证、凭据库与导入导出及窗口交互验收。

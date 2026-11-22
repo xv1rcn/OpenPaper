@@ -5,17 +5,28 @@ on:
 permissions:
   contents: read
 jobs:
-  macos:
-    runs-on: macos-latest
-    timeout-minutes: 20
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
+      - name: Install Linux desktop dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev build-essential libxdo-dev libssl-dev libayatana-appindicator3-dev librsvg2-dev
       - uses: actions/setup-node@v4
         with:
           node-version: '24'
           cache: npm
           cache-dependency-path: frontend/package-lock.json
-      - run: npm ci && npm run build
+      - run: npm ci
         working-directory: frontend
-      - run: cargo check --locked
+      - run: npm run build
+        working-directory: frontend
+      - run: cargo build --locked
         working-directory: desktop

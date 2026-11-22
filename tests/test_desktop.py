@@ -32,7 +32,7 @@ class DesktopTests(unittest.TestCase):
 
     def test_parent_pipe_closure_stops_backend(self):
         with tempfile.TemporaryDirectory() as temp:
-            proc=subprocess.Popen([sys.executable,'-m','backend','--desktop','--port','0','--ready-json','--library-root',temp,'--config-root',str(Path(temp)/'config')],stdin=subprocess.PIPE,stdout=subprocess.PIPE,stderr=subprocess.PIPE,env=dict(os.environ,OPENPAPER_DESKTOP_TOKEN='b'*32),text=True)
+            proc=subprocess.Popen([sys.executable,'-m','backend','--desktop','--port','0','--ready-json','--library-root',str(Path(temp)/'论文 library'),'--config-root',str(Path(temp)/'配置 config')],stdin=subprocess.PIPE,stdout=subprocess.PIPE,stderr=subprocess.PIPE,env=dict(os.environ,OPENPAPER_DESKTOP_TOKEN='b'*32,PYTHONUTF8='1'),text=True,encoding="utf-8")
             try:
                 ready=threading.Event();events=[]
                 def read():
