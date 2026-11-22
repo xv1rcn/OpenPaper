@@ -127,7 +127,7 @@ Vite 将 cmaps、standard_fonts、wasm 和许可证复制到 dist/pdfjs，开发
 
 ## 桌面开发
 
-运行方式及当前限制见 [desktop/README.md](../desktop/README.md)。默认独立数据目录；旧浏览器服务仍可使用 8001，不与桌面服务共用配置或目录。
+开发启动、内置 Python 的应用包构建与当前限制见 [desktop/README.md](../desktop/README.md)。默认独立数据目录；旧浏览器服务仍可使用 8001，不与桌面服务共用配置或目录。
 
 ## 桌面滚动边界
 
@@ -136,3 +136,10 @@ Vite 将 cmaps、standard_fonts、wasm 和许可证复制到 dist/pdfjs，开发
 阅读工作区以 flex 分配顶部栏之外的剩余高度，不再叠加 reader-columns 的 `100vh - 135px` 与 PDF 的 `76vh`。PDF 与速读正文独立滚动；生成选项有独立高度上限，容器设置 overscroll-behavior 阻止边缘滚动向外传播。书库 680px 以下、阅读器 800px 以下仍使用窄屏纵向布局。
 
 回归：`npm run test:e2e -- scroll.spec`，覆盖 1024×768、900×600 下内容滚动、标签滚动、固定控件位置及生成选项展开。设置 `OPENPAPER_TEST_BROWSER=webkit` 可使用已安装的 Playwright WebKit 运行相同测试。
+
+
+## 冻结后端回归
+
+`scripts/packaging/build_backend.py` 将后端及前端静态资源打包为 onedir；`smoke_backend.py` 验证搬移后的独立运行。三平台桌面 CI 同时运行这两个步骤。构建依赖独立放在 `scripts/packaging/requirements.txt`，不增加普通后端的运行依赖。
+
+本地 macOS 已完成 release `.app` 构建、冻结依赖检查与脱离源码目录的后端会话/资源/退出测试。受限执行环境的 FSEvents 测试出现原生崩溃，因此在 `OPENPAPER_POLLING_WATCHER=1` 下完成 72 项后端测试。完整原生窗口启动与交互尚待桌面环境验收，不能用后端冒烟测试替代。

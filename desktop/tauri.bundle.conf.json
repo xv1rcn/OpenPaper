@@ -1,0 +1,6 @@
+{
+  "bundle": {
+    "active": true,
+    "resources": { "packaged/openpaper-backend/": "backend/" }
+  }
+}

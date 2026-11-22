@@ -36,23 +36,40 @@ fn main() {
             }
         }))
         .setup(|app| {
-            let root = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-                .parent()
-                .unwrap()
-                .to_path_buf();
-            let python = std::env::var_os("OPENPAPER_PYTHON")
-                .map(PathBuf::from)
-                .unwrap_or(root.join(if cfg!(windows) {
-                    ".venv/Scripts/python.exe"
-                } else {
-                    ".venv/bin/python"
-                }));
+            let resources = app.path().resource_dir()?;
+            let executable = resources.join("backend").join(if cfg!(windows) {
+                "openpaper-backend.exe"
+            } else {
+                "openpaper-backend"
+            });
+            let mut command;
+            if executable.is_file() {
+                command = Command::new(executable);
+            } else if cfg!(debug_assertions) {
+                let root = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+                    .parent()
+                    .unwrap()
+                    .to_path_buf();
+                let python = std::env::var_os("OPENPAPER_PYTHON")
+                    .map(PathBuf::from)
+                    .unwrap_or(root.join(if cfg!(windows) {
+                        ".venv/Scripts/python.exe"
+                    } else {
+                        ".venv/bin/python"
+                    }));
+                command = Command::new(python);
+                command
+                    .args(["-m", "backend", "--resource-root"])
+                    .arg(&root)
+                    .current_dir(root);
+            } else {
+                return Err(format!("Bundled backend missing: {}", executable.display()).into());
+            }
             let data = std::env::var_os("OPENPAPER_DATA_DIR")
                 .map(PathBuf::from)
                 .unwrap_or(app.path().app_data_dir()?);
             std::fs::create_dir_all(&data)?;
             let token = uuid::Uuid::new_v4().simple().to_string();
-            let mut command = Command::new(python);
             // Keep the Python helper from opening a console window on Windows.
             #[cfg(windows)]
             {
@@ -60,23 +77,12 @@ fn main() {
                 command.creation_flags(0x08000000); // CREATE_NO_WINDOW
             }
             let mut child = command
-                .args([
-                    "-m",
-                    "backend",
-                    "--port",
-                    "0",
-                    "--ready-json",
-                    "--desktop",
-                    "--library-root",
-                ])
+                .args(["--port", "0", "--ready-json", "--desktop", "--library-root"])
                 .arg(data.join("library"))
                 .arg("--config-root")
                 .arg(data.join("config"))
-                .arg("--resource-root")
-                .arg(&root)
                 .env("OPENPAPER_DESKTOP_TOKEN", &token)
                 .env("PYTHONUTF8", "1")
-                .current_dir(&root)
                 .stdin(Stdio::piped())
                 .stdout(Stdio::piped())
                 .stderr(Stdio::inherit())

@@ -57,3 +57,6 @@ frontend/playwright-report/
 # Tauri build products
 desktop/target/
 desktop/gen/
+
+# Frozen Python helper
+desktop/packaged/

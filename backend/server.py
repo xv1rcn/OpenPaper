@@ -15,6 +15,7 @@ import re
 from urllib.parse import urlparse, parse_qs, unquote, quote
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from watchdog.observers import Observer
+from watchdog.observers.polling import PollingObserver
 
 if __package__ in (None, ""):
     sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -664,7 +665,8 @@ def main(argv=None):
             sys.stdin.buffer.read()
             stopped.set()
         threading.Thread(target=watch_parent, daemon=True).start()
-    observer = Observer()
+    # Restricted hosts may forbid native filesystem event streams.
+    observer = PollingObserver() if os.environ.get("OPENPAPER_POLLING_WATCHER") == "1" else Observer()
     serving = False
     watching = False
     old_signals = {}
