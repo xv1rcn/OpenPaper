@@ -9,10 +9,11 @@ test("native close request preserves drafts on cancel and emits approval only af
       window as Window & { __OPENPAPER_DESKTOP__?: boolean }
     ).__OPENPAPER_DESKTOP__ = true;
   });
-  // Model the host's cancelled navigation signals, without exiting the browser.
+  // HTTP 204 keeps the current document, matching a host-intercepted navigation.
+  // abort() would instead replace it with Chromium's network-error page.
   await page.route("**/desktop/*", async (route) => {
     actions.push(new URL(route.request().url()).pathname);
-    await route.abort();
+    await route.fulfill({ status: 204 });
   });
   await page.goto("/app/");
   await expect.poll(() => actions.includes("/desktop/ui-ready")).toBe(true);
@@ -52,7 +53,7 @@ test("backend failure keeps the editing page and guards restart", async ({
   });
   await page.route("**/desktop/*", async (route) => {
     actions.push(new URL(route.request().url()).pathname);
-    await route.abort();
+    await route.fulfill({ status: 204 });
   });
   await page.goto("/app/");
   await expect.poll(() => actions.includes("/desktop/ui-ready")).toBe(true);
