@@ -27,8 +27,8 @@ test("library edits persist, deletion restores and filters remain usable", async
   await expect(page.getByLabel("阅读笔记")).toHaveValue(
     "Follow up on evaluation protocol.",
   );
-  page.once("dialog", (dialog) => dialog.accept());
   await page.getByRole("button", { name: "移入回收站" }).click();
+  await page.getByRole("alertdialog").getByRole("button").last().click();
   await expect(page.getByRole("dialog")).toHaveCount(0);
   await page.getByRole("button", { name: /回收站/ }).click();
   await expect(page.locator(".recycle-row")).toHaveCount(1);

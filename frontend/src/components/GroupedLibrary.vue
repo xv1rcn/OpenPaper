@@ -75,9 +75,7 @@ function toggle(tag: string) {
       <button @click="collapsed = []">展开全部分组</button
       ><button @click="collapsed = groups.map((g) => g.tag)">
         折叠全部分组</button
-      ><span class="field-help"
-        >可拖动分组标题调整顺序；多标签论文会显示在各自分组。</span
-      >
+      ><span class="field-help">多标签论文可出现在多个分组。</span>
     </div>
     <section
       v-for="(group, index) in groups"

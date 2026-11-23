@@ -37,7 +37,7 @@ const heatDays = computed(() => {
   <div class="extended-statistics">
     <section>
       <h2>累计增长与阅读进度</h2>
-      <p class="field-help">按加入月份统计当前已读数量，不代表实际阅读日期。</p>
+      <p class="field-help">按加入月份分组，已读为当前状态。</p>
       <svg
         v-if="data.months.length"
         viewBox="0 0 700 210"

@@ -1,4 +1,14 @@
 import type { Paper, RecycleItem } from "./types";
+export class ApiError extends Error {
+  constructor(
+    message: string,
+    public status: number,
+    public code?: string,
+  ) {
+    super(message);
+    this.name = "ApiError";
+  }
+}
 export async function request<T>(path: string, body?: unknown): Promise<T> {
   const response = await fetch(
     path,
@@ -15,7 +25,11 @@ export async function request<T>(path: string, body?: unknown): Promise<T> {
   );
   const data = await response.json().catch(() => null);
   if (!response.ok || !data?.ok)
-    throw new Error(data?.error || `请求失败 (${response.status})`);
+    throw new ApiError(
+      data?.error || `请求失败 (${response.status})`,
+      response.status,
+      data?.code,
+    );
   return data as T;
 }
 export const api = {

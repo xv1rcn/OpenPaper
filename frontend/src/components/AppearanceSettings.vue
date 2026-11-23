@@ -1,4 +1,7 @@
 <script setup lang="ts">
+import { useTransientMessage } from "@/composables/useTransientMessage";
+import { confirmAction } from "@/lib/confirmation";
+import Feedback from "@/components/Feedback.vue";
 import { computed, onMounted, ref, watch } from "vue";
 import Button from "./ui/button/Button.vue";
 import {
@@ -13,11 +16,21 @@ const values = ref({ ...appearanceDefaults }),
   busy = ref(false),
   message = ref(""),
   error = ref("");
+useTransientMessage(message);
 const dirty = computed(() => JSON.stringify(values.value) !== baseline.value);
 watch(busy, (value) => emit("busy", value));
-watch(dirty, (value) => emit("dirty", value));
+watch(dirty, (value) => {
+  emit("dirty", value);
+});
+watch(
+  values,
+  () => {
+    message.value = "";
+  },
+  { deep: true, flush: "sync" },
+);
 async function load() {
-  if (dirty.value && !confirm("放弃未保存的外观修改？")) return;
+  if (dirty.value && !(await confirmAction("放弃未保存的外观修改？"))) return;
   busy.value = true;
   try {
     const data = await preferencesApi.load();
@@ -26,7 +39,7 @@ async function load() {
     revision.value = data.revision;
     error.value = "";
   } catch (e) {
-    error.value = String(e);
+    error.value = e instanceof Error ? e.message : String(e);
   } finally {
     busy.value = false;
   }
@@ -42,7 +55,7 @@ async function save() {
     applyAppearance(data.values);
     message.value = "已保存";
   } catch (e) {
-    error.value = String(e);
+    error.value = e instanceof Error ? e.message : String(e);
   } finally {
     busy.value = false;
   }
@@ -69,7 +82,6 @@ onMounted(load);
 </script>
 <template>
   <section class="appearance-settings">
-    <h3>外观</h3>
     <div class="preset-buttons">
       <Button variant="outline" :disabled="busy" @click="preset('light')"
         >浅色</Button
@@ -95,16 +107,20 @@ onMounted(load);
         type="color"
         :disabled="busy"
     /></label>
-    <p v-if="error" class="inline-error" role="alert">{{ error }}</p>
-    <p v-if="message" role="status">{{ message }}</p>
+    <Feedback :message="error" />
+    <Feedback :message="message" kind="success" />
     <div class="dialog-footer">
-      <Button variant="outline" :disabled="busy" @click="load"
-        >重新加载外观</Button
-      ><Button variant="outline" :disabled="busy" @click="preset('light')"
+      <Button
+        v-if="dirty || error"
+        variant="outline"
+        :disabled="busy"
+        @click="load"
+        >{{ dirty ? "放弃修改" : "重试" }}</Button><Button
+        variant="outline"
+        :disabled="busy"
+        @click="preset('light')"
         >恢复默认</Button
-      ><Button :disabled="busy || revision === null" @click="save"
-        >保存外观</Button
-      >
+      ><Button :disabled="busy || revision === null" @click="save">保存</Button>
     </div>
   </section>
 </template>

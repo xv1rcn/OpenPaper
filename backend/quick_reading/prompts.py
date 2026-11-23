@@ -5,7 +5,7 @@ from .models import clean_page_text
 
 def _depth_instruction(depth):
     if depth == "brief":
-        return "保持简洁，但实验速读仍必须结构化，不得只写一两句话；技术细节速读只覆盖最关键模块和必要术语；每个图表 summary 写 1 句，约 60-100 字。"
+        return "简要模式以约 600-900 字中文正文为目标（不含 JSON 字段名）。核心要点最多 3 条，方法步骤最多 3 条，技术模块最多 2 个，术语最多 2 个，只保留必要背景。实验保留数据集、主要对比结果和关键限制，不重复各章节已有内容；可选列表无必要内容时返回空数组。每个图表 summary 仅 1 句。事实、证据与关键局限优先于字数目标，不截断句子。"
     if depth == "deep":
         return "适当展开方法细节、技术模块、专业术语、实验设计和复现难点，尤其要解释 baseline、ablation、dataset 和 metric；技术细节速读通常为方法速读的 3-5 倍；每个图表 summary 写 3-4 句，约 180-260 字。"
     return "详略适中，优先保证技术细节、实验和图表解释完整；技术细节速读通常为方法速读的 3-5 倍；每个图表 summary 写 2 句，约 100-160 字。"
@@ -36,7 +36,7 @@ def build_speedread_prompt(paper_meta, grounding_text, candidate_pages, options)
         "2. 没有明确说明的地方，必须写“论文中未明确说明”。\n"
         "3. 输出中文；必要英文术语可以保留，但要用中文解释其含义。\n"
         "4. 不要夸奖论文，不要写营销式语言，不要把摘要机械翻译成中文。\n"
-        "5. 用户特别关注实验，因此 experiment_read 必须细，不能压缩成一两句话。\n"
+        f"5. {'实验保留主要对比、证据及局限，遵守简要模式篇幅要求。' if depth == 'brief' else '实验速读必须详细，不能压缩成一两句话。'}\n"
         "6. method_overview 只讲高层方法路线；technical_detail_read 承接关键模块、专业术语、方法背景和容易误解的机制。\n"
         "7. technical_detail_read 要自然嵌入模块解释，不要堆术语表；只有阻碍理解时才使用简短例子或类比。\n"
         "8. 仅输出一个合法 JSON 对象，不要输出 Markdown 代码块或额外解释。\n\n"

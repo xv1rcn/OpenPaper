@@ -35,7 +35,6 @@ defineEmits<{
         >.</span
       ></a
     >
-    <div class="workspace-label">我的研究空间</div>
     <nav aria-label="论文集合">
       <button
         :class="{ active: collection === 'all' && !tag }"
@@ -89,9 +88,7 @@ defineEmits<{
       >
         <Hash :size="16" /><span class="tag-name">{{ item }}</span>
       </button>
-      <p v-if="!tags.length" class="sidebar-hint">
-        在论文信息中添加标签，<br />让相关研究聚在一起。
-      </p>
+      <p v-if="!tags.length" class="sidebar-hint">暂无标签</p>
     </nav>
     <div class="sidebar-bottom">
       <nav>
@@ -104,7 +101,6 @@ defineEmits<{
           <Settings2 :size="17" />设置
         </button>
       </nav>
-      <div class="local-status"><span></span>本地论文库 · 无需账号</div>
     </div>
   </aside>
 </template>

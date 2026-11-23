@@ -1,5 +1,7 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from "vue";
+import { confirmAction } from "@/lib/confirmation";
+import Feedback from "@/components/Feedback.vue";
+import { computed, onMounted, ref, watch } from "vue";
 import {
   DialogRoot,
   DialogPortal,
@@ -8,10 +10,13 @@ import {
   DialogTitle,
   DialogDescription,
 } from "reka-ui";
-import { X, ShieldCheck, Download, Settings2 } from "@lucide/vue";
+import { X, Download, Settings2 } from "@lucide/vue";
 import Button from "./ui/button/Button.vue";
 import { useUnsavedChanges } from "@/composables/useUnsavedChanges";
 import AppearanceSettings from "./AppearanceSettings.vue";
+import { useTransientMessage } from "@/composables/useTransientMessage";
+const action = ref("");
+const warning = ref("");
 const tab = ref("model"),
   appearanceBusy = ref(false),
   appearanceDirty = ref(false);
@@ -37,6 +42,14 @@ const dirty = computed(
     (!!saved.value &&
       JSON.stringify(provider.value) !== JSON.stringify(saved.value.provider)),
 );
+useTransientMessage(message);
+watch(
+  [provider, apiKey],
+  () => {
+    message.value = "";
+  },
+  { deep: true, flush: "sync" },
+);
 useUnsavedChanges(computed(() => dirty.value || appearanceDirty.value));
 function apply(data: Settings) {
   saved.value = data;
@@ -44,32 +57,36 @@ function apply(data: Settings) {
   apiKey.value = "";
   legacy.value = hasLegacy();
 }
-async function run(action: () => Promise<void>) {
+async function run(task: () => Promise<void>, label = "加载中…") {
   if (busy.value) return;
   busy.value = true;
+  action.value = label;
+  warning.value = "";
   error.value = "";
   message.value = "";
   try {
-    await action();
+    await task();
   } catch (e) {
     error.value = e instanceof Error ? e.message : "操作失败，请重试";
   } finally {
     busy.value = false;
+    action.value = "";
   }
 }
-function load() {
-  if (dirty.value && !confirm("放弃未保存的修改，重新加载配置？")) return;
+async function load() {
+  if (dirty.value && !(await confirmAction("放弃未保存的修改，重新加载配置？")))
+    return;
   run(async () => {
     apply(await settingsApi.load());
     models.value = [];
   });
 }
-function close() {
+async function close() {
   if (
     !busy.value &&
     !appearanceBusy.value &&
     (!(dirty.value || appearanceDirty.value) ||
-      confirm("放弃未保存的配置修改？"))
+      (await confirmAction("放弃未保存的配置修改？")))
   )
     emit("close");
 }
@@ -83,34 +100,42 @@ function save() {
     );
     apply(result);
     models.value = [];
-    message.value =
+    warning.value =
       result.warning ||
-      (result.hasCredential
-        ? "配置已保存。密钥存入系统凭据库，重启后继续使用。"
-        : "普通配置已保存，尚未保存密钥。");
-  });
+      (!result.hasCredential ? "配置已保存，请填写 API Key 后使用速读。" : "");
+    if (!warning.value) message.value = "已保存";
+  }, "保存中…");
 }
-function reset() {
-  if (!saved.value || !confirm("清空速读配置并删除已保存的系统凭据？")) return;
+async function reset() {
+  if (
+    !saved.value ||
+    !(await confirmAction("清空速读配置并删除已保存的系统凭据？", "清空配置"))
+  )
+    return;
   run(async () => {
     const result = await settingsApi.reset(saved.value!.revision);
     apply(result);
     models.value = [];
-    message.value = result.warning || "配置及凭据已清空。";
-  });
+    warning.value = result.warning || "";
+    if (!warning.value) message.value = "配置已清空";
+  }, "清空中…");
 }
-function importOld() {
+async function importOld() {
   if (
     !saved.value ||
-    !confirm("用旧浏览器配置替换当前配置？成功保存后将删除浏览器中的旧密钥。")
+    !(await confirmAction(
+      "用旧浏览器配置替换当前配置？成功保存后将删除浏览器中的旧密钥。",
+      "导入旧配置",
+    ))
   )
     return;
   run(async () => {
     const result = await importLegacy(saved.value!.revision);
     apply(result);
     models.value = [];
-    message.value = result.warning || "旧配置已导入，浏览器中的旧密钥已删除。";
-  });
+    warning.value = result.warning || "";
+    if (!warning.value) message.value = "旧配置已导入";
+  }, "导入中…");
 }
 function assertSaved(requireModel = true) {
   if (dirty.value) throw new Error("请先保存修改，再使用已保存的配置。");
@@ -126,15 +151,18 @@ function loadModels() {
     assertSaved(false);
     const result = await settingsApi.models();
     models.value = result.models;
-    message.value = `已读取 ${models.value.length} 个模型。${(result.warnings || []).join("；")}`;
-  });
+    warning.value = (result.warnings || []).join("；");
+    message.value = models.value.length
+      ? `已读取 ${models.value.length} 个模型`
+      : "未找到模型，可手动填写模型名称";
+  }, "读取中…");
 }
 function testConnection() {
   run(async () => {
     assertSaved();
-    const result = await settingsApi.test();
-    message.value = result.preview || "接口连接成功。";
-  });
+    await settingsApi.test();
+    message.value = "连接成功";
+  }, "测试中…");
 }
 onMounted(load);
 </script>
@@ -188,14 +216,6 @@ onMounted(load);
           @dirty="appearanceDirty = $event"
         />
         <div v-show="tab === 'model'">
-          <div class="settings-security">
-            <ShieldCheck :size="17" /><span>{{
-              saved?.hasCredential
-                ? "已保存密钥 · 留空即可继续使用"
-                : "尚未保存密钥"
-            }}</span
-            ><span v-if="dirty" class="unsaved-label">未保存</span>
-          </div>
           <form @submit.prevent="save">
             <fieldset :disabled="busy || !saved">
               <label
@@ -207,12 +227,19 @@ onMounted(load);
                   autocomplete="off"
               /></label>
               <label
-                >API Key<input
+                >API Key
+                <span
+                  aria-hidden="true"
+                  v-if="saved?.hasCredential"
+                  class="credential-status"
+                  >已设置</span
+                ><input
+                  aria-label="API Key"
                   v-model="apiKey"
                   type="password"
                   :placeholder="
                     saved?.hasCredential
-                      ? '已保存；留空不更换'
+                      ? '输入新密钥以替换'
                       : '输入服务商提供的密钥'
                   "
                   autocomplete="new-password"
@@ -230,7 +257,7 @@ onMounted(load);
                   variant="outline"
                   :disabled="busy || dirty || !saved?.hasCredential"
                   @click="loadModels"
-                  >读取模型</Button
+                  >{{ action === "读取中…" ? action : "读取模型" }}</Button
                 >
               </div>
               <datalist id="provider-models">
@@ -285,15 +312,16 @@ onMounted(load);
                 >
               </div>
             </fieldset>
-            <p v-if="error" role="alert" class="inline-error">{{ error }}</p>
-            <p v-if="message" role="status" class="settings-message">
-              {{ message }}
-            </p>
-            <p v-if="busy" role="status" class="field-help">处理中，请稍候…</p>
+            <Feedback :message="error" />
+            <Feedback :message="warning" kind="warning" />
             <div class="settings-secondary">
-              <button type="button" :disabled="busy" @click="load">
-                重新加载</button
-              ><button
+              <button
+                v-if="dirty || !saved"
+                type="button"
+                :disabled="busy"
+                @click="load"
+              >
+                {{ dirty ? "放弃修改" : "重试" }}</button><button
                 type="button"
                 class="danger-link"
                 :disabled="busy || !saved"
@@ -302,16 +330,23 @@ onMounted(load);
                 清空配置
               </button>
             </div>
+            <p id="model-test-cost" class="field-help">
+              测试会发送一次模型请求，可能产生费用。
+            </p>
             <div class="dialog-footer">
+              <span v-if="dirty" class="field-help">未保存</span>
+              <Feedback v-else :message="message" kind="success" />
               <Button
                 type="button"
                 variant="outline"
                 :disabled="busy || dirty || !saved?.hasCredential"
+                aria-describedby="model-test-cost"
                 @click="testConnection"
-                >测试接口（会调用模型）</Button
-              ><Button type="submit" :disabled="busy || !saved"
-                >保存配置</Button
-              >
+                >{{
+                  action === "测试中…" ? action : "测试连接"
+                }}</Button><Button type="submit" :disabled="busy || !saved">{{
+                action === "保存中…" ? action : "保存"
+              }}</Button>
             </div>
           </form>
         </div>

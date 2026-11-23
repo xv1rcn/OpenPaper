@@ -1,5 +1,5 @@
 import { normalizeSpeedReadContent } from "./reading-normalizer.js";
-import { request } from "./api";
+import { request, ApiError } from "./api";
 export interface SpeedRead {
   status?: string;
   model?: string;
@@ -12,10 +12,30 @@ export interface SpeedRead {
 }
 export const normalizeReading = (value: SpeedRead) =>
   normalizeSpeedReadContent(value);
-export const loadReading = (key: string) =>
-  request<{ speed_read: SpeedRead }>(
-    "/api/speedread-cache?file_key=" + encodeURIComponent(key),
-  );
+export async function loadReading(
+  key: string,
+): Promise<{ speed_read: SpeedRead }> {
+  try {
+    return await request<{ speed_read: SpeedRead }>(
+      "/api/speedread-cache?file_key=" + encodeURIComponent(key),
+    );
+  } catch (error) {
+    if (
+      error instanceof ApiError &&
+      error.status === 404 &&
+      error.code === "speedread_not_generated"
+    )
+      return { speed_read: {} };
+    throw error;
+  }
+}
+export function hasReadingContent(value: unknown): boolean {
+  if (value === null || value === undefined || value === "") return false;
+  if (Array.isArray(value)) return value.some(hasReadingContent);
+  if (typeof value === "object")
+    return Object.values(value).some(hasReadingContent);
+  return true;
+}
 export function download(data: Blob, name: string) {
   const url = URL.createObjectURL(data),
     link = document.createElement("a");

@@ -17,33 +17,30 @@ defineEmits<{ edit: [paper: Paper]; toggleRead: [paper: Paper] }>();
       :aria-label="`阅读 ${paper.title}`"
     >
       <div class="cover-top">
-        <span>{{ paper.venue || "PAPER" }}</span><span>{{
-          paper.year || "—"
-        }}</span>
+        <span>{{ paper.venue }}</span><span>{{ paper.year }}</span>
       </div>
       <div class="cover-title">{{ paper.title }}</div>
       <div class="cover-lines" aria-hidden="true">
         <i></i><i></i><i></i><i></i><i></i>
       </div>
       <div class="cover-footer">
-        <span>RESEARCH PAPER</span><ArrowUpRight :size="15" />
+        <ArrowUpRight :size="15" />
       </div>
     </a>
     <div class="paper-info">
       <div class="paper-meta">
         <span>{{
-          [paper.venue, paper.year].filter(Boolean).join(" · ") || "学术论文"
+          [paper.venue, paper.year].filter(Boolean).join(" · ")
         }}</span><span v-if="paper.read" class="read-badge"
           ><Check :size="11" /> 已读</span
         >
       </div>
       <a class="paper-title" :href="readerUrl(paper)">{{ paper.title }}</a>
-      <p class="paper-authors">
-        {{
-          paper.authors && paper.authors !== "Unknown"
-            ? paper.authors
-            : "作者信息待补充"
-        }}
+      <p
+        v-if="paper.authors && paper.authors !== 'Unknown'"
+        class="paper-authors"
+      >
+        {{ paper.authors }}
       </p>
       <div class="paper-tags">
         <span v-for="tag in paper.tags.slice(0, 3)" :key="tag">{{

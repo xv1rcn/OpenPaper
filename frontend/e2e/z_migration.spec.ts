@@ -43,7 +43,7 @@ test("appearance survives reload and tab changes preserve drafts", async ({
   await page.getByRole("button", { name: "速读", exact: true }).click();
   await page.getByRole("button", { name: "外观", exact: true }).click();
   await expect(page.getByLabel("页面背景")).toHaveValue("#1d2520");
-  await page.getByRole("button", { name: "保存外观" }).click();
+  await page.getByRole("button", { name: "保存" }).click();
   await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
   await page.reload();
   await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
@@ -51,7 +51,7 @@ test("appearance survives reload and tab changes preserve drafts", async ({
   await page.getByRole("button", { name: "外观", exact: true }).click();
   await expect(page.getByLabel("页面背景")).toHaveValue("#1d2520");
   await page.getByRole("button", { name: "恢复默认" }).click();
-  await page.getByRole("button", { name: "保存外观" }).click();
+  await page.getByRole("button", { name: "保存" }).click();
   await expect(page.locator("html")).toHaveAttribute("data-theme", "light");
 });
 
@@ -75,7 +75,7 @@ test("group order persists and metadata export retains original fields", async (
   await expect(page.locator(".paper-card").first()).toBeVisible();
   await page.getByRole("button", { name: "导出与管理" }).click();
   const downloading = page.waitForEvent("download");
-  await page.getByRole("button", { name: "导出元数据 JSON" }).click();
+  await page.getByRole("button", { name: "导出全库 JSON" }).click();
   const download = await downloading;
   const data = JSON.parse(await readFile((await download.path())!, "utf8"));
   expect(data["fixture-0.pdf"].authors).toBe("Test Author");

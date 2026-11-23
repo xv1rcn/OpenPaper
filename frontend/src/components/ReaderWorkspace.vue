@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { confirmAction } from "@/lib/confirmation";
+import Feedback from "@/components/Feedback.vue";
 import { viewState } from "@/lib/view-state";
 import NoteText from "./NoteText.vue";
 import {
@@ -15,6 +17,7 @@ import StructuredRead from "./StructuredRead.vue";
 import { api, request, normalizePaper, pdfUrl } from "@/lib/api";
 import {
   loadReading,
+  hasReadingContent,
   normalizeReading,
   safeFigure,
   exportReading,
@@ -41,7 +44,7 @@ const page = ref(1),
 const focus = ref(["general", "experiment", "reproduction", "figure"]);
 const normalized = computed(() => normalizeReading(reading.value));
 const sections = [
-  ["one_sentence", "快速省流总结"],
+  ["one_sentence", "概要"],
   ["quick_takeaways", "核心要点"],
   ["problem_and_motivation", "问题与动机"],
   ["method_overview", "方法概述"],
@@ -53,6 +56,21 @@ const sections = [
   ["figure_insights", "图表解读"],
   ["deep_read_suggestions", "精读建议"],
 ];
+const visibleSections = computed(() =>
+  sections.filter(([key]) => hasReadingContent(normalized.value[key])),
+);
+const stage = computed(() => {
+  const percent = reading.value.progress?.percent || 0;
+  return percent < 60
+    ? "正在读取原文…"
+    : percent < 85
+      ? "正在生成速读…"
+      : "正在整理结果…";
+});
+const generatedAt = computed(() => {
+  const date = new Date(reading.value.updated_at || "");
+  return Number.isNaN(date.getTime()) ? "" : date.toLocaleString();
+});
 const pdf = computed(() => paper.value && pdfUrl(paper.value));
 const figureItems = computed(
   () =>
@@ -88,9 +106,12 @@ async function refresh() {
   polling = true;
   try {
     const data = await loadReading(props.fileKey);
-    if (active) reading.value = data.speed_read || {};
+    if (active) {
+      reading.value = data.speed_read || {};
+      error.value = "";
+    }
   } catch (e) {
-    if (active) error.value = String(e);
+    if (active) error.value = e instanceof Error ? e.message : String(e);
   } finally {
     polling = false;
   }
@@ -99,7 +120,10 @@ async function generate() {
   if (pending.value || reading.value.status === "running") return;
   if (
     reading.value.status === "success" &&
-    !confirm("重新生成将替换当前速读结果，并调用模型。继续吗？")
+    !(await confirmAction(
+      "将替换当前速读结果，并发送模型请求，可能产生费用。",
+      "重新生成",
+    ))
   )
     return;
   pending.value = true;
@@ -123,19 +147,25 @@ async function generate() {
     );
     if (active) reading.value = data.speed_read;
   } catch (e) {
-    if (active) error.value = String(e);
+    if (active) error.value = e instanceof Error ? e.message : String(e);
   } finally {
     pending.value = false;
-    if (active) await refresh();
+    if (active && !error.value) await refresh();
   }
 }
 async function remove() {
-  if (!confirm("将这篇论文的速读结果移入回收站？PDF 原文会保留。")) return;
+  if (
+    !(await confirmAction(
+      "将这篇论文的速读结果移入回收站？PDF 原文会保留。",
+      "移入回收站",
+    ))
+  )
+    return;
   try {
     await api.deleteSpeedread(props.fileKey);
     reading.value = {};
   } catch (e) {
-    error.value = String(e);
+    error.value = e instanceof Error ? e.message : String(e);
   }
 }
 async function exportAs(format: "pdf" | "pptx") {
@@ -144,7 +174,7 @@ async function exportAs(format: "pdf" | "pptx") {
   try {
     await exportReading(props.fileKey, format);
   } catch (e) {
-    error.value = String(e);
+    error.value = e instanceof Error ? e.message : String(e);
   } finally {
     exportBusy.value = false;
   }
@@ -178,7 +208,7 @@ onMounted(async () => {
     if (typeof old.max_figures === "number") maxFigures.value = old.max_figures;
     if (typeof old.extra_prompt === "string") extra.value = old.extra_prompt;
   } catch (e) {
-    error.value = String(e);
+    error.value = e instanceof Error ? e.message : String(e);
   } finally {
     loading.value = false;
   }
@@ -257,7 +287,8 @@ onUnmounted(() => {
         >
       </div>
       <section v-if="optionsOpen" class="generate-options">
-        <h2>速读生成选项</h2>
+        <h2>生成速读</h2>
+        <p class="field-help">将向已配置的模型发送论文内容，可能产生费用。</p>
         <label
           >深度<select v-model="depth">
             <option value="brief">简要</option>
@@ -289,17 +320,17 @@ onUnmounted(() => {
             min="3"
             max="12" /></label
         ><Button :disabled="pending || !focus.length" @click="generate"
-          >开始生成（会调用模型）</Button
+          >开始生成</Button
         >
       </section>
-      <p v-if="error" role="alert" class="error-banner">{{ error }}</p>
+      <Feedback v-if="error" :message="error" />
       <div
         v-if="pending || reading.status === 'running'"
         class="reader-progress"
-        role="status"
       >
-        {{ reading.progress?.message || "正在生成速读，可以继续阅读原文…"
-        }}<progress :value="reading.progress?.percent || 0" max="100" />
+        <span role="status">{{ stage }}</span><progress
+          aria-label="速读生成进度"
+        />
       </div>
       <div class="reader-columns">
         <section
@@ -315,33 +346,32 @@ onUnmounted(() => {
               page = $event;
               saveLayout();
             "
-          /><a :href="pdf" target="_blank" rel="noopener"
-            >在独立窗口打开原始 PDF</a
-          >
+          /><a :href="pdf" target="_blank" rel="noopener">打开原文 ↗</a>
         </section>
         <article class="reading-content">
           <nav v-if="reading.status === 'success'" class="reading-toc">
-            <a v-for="[key, label] in sections" :key="key" :href="'#' + key">{{
-              label
-            }}</a>
+            <a
+              v-for="[key, label] in visibleSections"
+              :key="key"
+              :href="'#' + key"
+              >{{ label }}</a
+            >
           </nav>
-          <p v-if="reading.model" class="field-help">
-            模型：{{ reading.model }} · {{ reading.updated_at }}
-          </p>
+
+          <Feedback
+            v-if="reading.status === 'error' && !error"
+            :message="reading.error || '速读生成失败，请重试。'"
+          />
           <div
-            v-if="reading.status === 'error'"
-            role="alert"
-            class="error-banner"
+            v-if="!reading.content && !error && !pending && !reading.status"
+            class="empty-state"
           >
-            {{ reading.error }}
+            <h2>尚未生成速读</h2>
+            <Button @click="optionsOpen = true">生成速读</Button>
           </div>
-          <div v-if="!reading.content" class="empty-state">
-            <h2>原文已就绪</h2>
-            <p>生成速读后，这里会显示总结、方法、实验与图表解读。</p>
-          </div>
-          <template v-else
+          <template v-if="reading.content"
             ><section
-              v-for="[key, label] in sections"
+              v-for="[key, label] in visibleSections"
               :id="key"
               :key="key"
               class="reading-section"
@@ -374,9 +404,17 @@ onUnmounted(() => {
                 @page="jump"
               /></section
           ></template>
-          <details v-if="reading.token_status" class="token-details">
-            <summary>Token 预算与用量</summary>
-            <StructuredRead :value="reading.token_status" />
+          <details
+            v-if="reading.model || reading.token_status"
+            class="token-details"
+          >
+            <summary>生成信息</summary>
+            <p v-if="reading.model">模型：{{ reading.model }}</p>
+            <p v-if="generatedAt">生成时间：{{ generatedAt }}</p>
+            <StructuredRead
+              v-if="reading.token_status"
+              :value="reading.token_status"
+            />
           </details>
           <section v-if="paper?.notes" class="reading-section">
             <h2>我的笔记</h2>

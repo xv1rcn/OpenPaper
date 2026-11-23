@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { confirmAction } from "@/lib/confirmation";
+import Feedback from "@/components/Feedback.vue";
 import { ref, watch, computed } from "vue";
 import {
   DialogRoot,
@@ -77,8 +79,11 @@ const dirty = computed(
         JSON.stringify(props.paper.tags)),
 );
 useUnsavedChanges(dirty);
-function close() {
-  if (!props.busy && (!dirty.value || confirm("放弃未保存的论文修改？")))
+async function close() {
+  if (
+    !props.busy &&
+    (!dirty.value || (await confirmAction("放弃未保存的论文修改？")))
+  )
     emit("close");
 }
 const tagSuggestions = computed(() => {
@@ -131,8 +136,8 @@ function save() {
         @pointer-down-outside="(event) => event.preventDefault()"
       >
         <DialogTitle class="dialog-title">论文信息</DialogTitle
-        ><DialogDescription class="dialog-description"
-          >整理标题、标签和笔记。修改会保存在本地论文库。</DialogDescription
+        ><DialogDescription class="sr-only"
+          >编辑论文信息和笔记。</DialogDescription
         >
         <button
           class="dialog-close"
@@ -186,7 +191,7 @@ function save() {
               :disabled="busy"
             ></textarea>
           </label>
-          <p v-if="error" class="inline-error" role="alert">{{ error }}</p>
+          <Feedback :message="error" />
           <p v-if="folderError" role="alert" class="inline-error">
             {{ folderError }}
           </p>

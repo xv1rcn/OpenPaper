@@ -1,4 +1,7 @@
 <script setup lang="ts">
+import { confirmAction } from "@/lib/confirmation";
+import ConfirmDialog from "./components/ConfirmDialog.vue";
+import Feedback from "@/components/Feedback.vue";
 import { viewState, viewStateError } from "@/lib/view-state";
 import { computed, nextTick, onMounted, onUnmounted, ref } from "vue";
 import {
@@ -6,7 +9,6 @@ import {
   LayoutGrid,
   List,
   RefreshCw,
-  ArrowUpRight,
   BookOpen,
   RotateCcw,
   X,
@@ -46,6 +48,9 @@ const {
   mutate,
   navigate,
 } = useLibrary();
+const searchShortcut = /Mac|iPhone|iPad/.test(navigator.platform)
+  ? "⌘ K"
+  : "Ctrl K";
 const routeKey = new URLSearchParams(location.search).get("file_key") || "";
 const exportSelection = ref<Paper[]>([]);
 function navigateView(next: import("./lib/types").Collection, nextTag = "") {
@@ -54,11 +59,12 @@ function navigateView(next: import("./lib/types").Collection, nextTag = "") {
 }
 async function purge(id?: string) {
   if (
-    !confirm(
+    !(await confirmAction(
       id
         ? "永久删除此回收站项目？无法撤销。"
         : "清空整个回收站？所有项目将永久删除，无法撤销。",
-    )
+      "永久删除",
+    ))
   )
     return;
   await mutate(() => (id ? api.purge(id) : api.purgeAll()), "已永久删除。");
@@ -123,19 +129,18 @@ const title = computed(
     }[collection.value],
 );
 async function save(paper: Paper, fields: Partial<Paper>) {
-  if (
-    await mutate(() => api.update(paper.file_key, fields), "论文信息已保存。")
-  )
+  if (await mutate(() => api.update(paper.file_key, fields), "已保存"))
     closeEditor();
 }
 async function remove(paper: Paper) {
-  if (!window.confirm(`将《${paper.title}》移入回收站？可以随时恢复。`)) return;
   if (
-    await mutate(
-      () => api.remove(paper.file_key),
-      "论文已移入回收站，可在左侧回收站恢复。",
-    )
+    !(await confirmAction(
+      `将《${paper.title}》移入回收站？可以随时恢复。`,
+      "移入回收站",
+    ))
   )
+    return;
+  if (await mutate(() => api.remove(paper.file_key), "已移入回收站"))
     closeEditor();
 }
 function keyboard(event: KeyboardEvent) {
@@ -161,7 +166,10 @@ onMounted(() => {
 onUnmounted(() => window.removeEventListener("keydown", keyboard));
 </script>
 <template>
-  <div v-if="viewStateError" role="alert" class="state-save-error">{{ viewStateError }}</div>
+  <ConfirmDialog />
+  <div v-if="viewStateError" role="alert" class="state-save-error">
+    {{ viewStateError }}
+  </div>
   <ReaderWorkspace v-if="routeKey" :file-key="routeKey" />
   <div v-else class="app-shell">
     <LibrarySidebar
@@ -176,12 +184,9 @@ onUnmounted(() => window.removeEventListener("keydown", keyboard));
     />
     <main class="main-content">
       <header class="topbar">
-        <span
-          >论文库 <span class="breadcrumb">/ {{ title }}</span></span
-        >
+        <span>书库</span>
         <div class="topbar-right">
-          <span class="quiet-label">让阅读，成为积累。</span
-          ><button
+          <button
             class="icon-button"
             :disabled="loading || busy || importing"
             aria-label="刷新论文库"
@@ -194,20 +199,12 @@ onUnmounted(() => window.removeEventListener("keydown", keyboard));
       <div class="library-content">
         <section class="page-heading">
           <div>
-            <div class="eyebrow">YOUR RESEARCH, COLLECTED</div>
             <h1>
               {{ title
               }}<span>{{
                 collection === "recycle" ? recycle.length : visible.length
               }}</span>
             </h1>
-            <p>
-              {{
-                collection === "recycle"
-                  ? "暂时放下的论文，随时可以找回来。"
-                  : "从一篇论文开始，把想法连接起来。"
-              }}
-            </p>
           </div>
           <ImportPdf
             :disabled="busy || loading"
@@ -221,15 +218,14 @@ onUnmounted(() => window.removeEventListener("keydown", keyboard));
             <X :size="15" />
           </button>
         </div>
-        <div v-if="error" class="error-banner" role="alert">
-          {{ error
-          }}<Button
+        <Feedback :message="error">
+          <Button
             variant="outline"
             :disabled="loading || busy || importing"
             @click="refresh"
             >重试</Button
           >
-        </div>
+        </Feedback>
         <LibraryStats v-if="collection === 'stats'" :papers="papers" />
         <LibraryTools
           v-else-if="collection === 'tools'"
@@ -248,7 +244,7 @@ onUnmounted(() => window.removeEventListener("keydown", keyboard));
                 placeholder="搜索标题、作者或标签…"
               /><button v-if="query" aria-label="清空搜索" @click="query = ''">
                 <X :size="15" /></button
-              ><kbd v-else>⌘ K</kbd>
+              ><kbd v-else>{{ searchShortcut }}</kbd>
             </div>
             <div class="toolbar-options">
               <button :aria-pressed="grouped" @click="toggleGrouping">
@@ -288,15 +284,7 @@ onUnmounted(() => window.removeEventListener("keydown", keyboard));
             v-model:tags="selectedTags"
             v-model:mode="tagMode"
           />
-          <div class="shelf-label">
-            <span>{{
-              tag
-                ? "# " + tag
-                : collection === "unread"
-                  ? "留给下一次专注"
-                  : "你的研究收藏"
-            }}</span><span>{{ visible.length }} 篇论文</span>
-          </div>
+
           <div
             v-if="loading && !papers.length"
             class="empty-state"
@@ -307,20 +295,18 @@ onUnmounted(() => window.removeEventListener("keydown", keyboard));
           <div v-else-if="!visible.length" class="empty-state">
             <FolderOpen :size="40" :stroke-width="1" />
             <h2>
-              {{ papers.length ? "没有匹配的论文" : "第一篇论文，从这里开始" }}
+              {{ papers.length ? "没有匹配的论文" : "还没有论文" }}
             </h2>
             <p>
               {{
-                papers.length
-                  ? "试试其他关键词，或返回全部论文。"
-                  : "点击“导入 PDF”添加论文，原文件会保留。"
+                papers.length ? "调整关键词或清除筛选。" : "导入 PDF 开始阅读。"
               }}
             </p>
             <Button
               v-if="papers.length"
               variant="outline"
               @click="navigate('all')"
-              >查看全部论文</Button
+              >清除筛选</Button
             >
           </div>
           <GroupedLibrary
@@ -359,10 +345,6 @@ onUnmounted(() => window.removeEventListener("keydown", keyboard));
               "
             />
           </div>
-          <footer class="library-footer">
-            <span>阅读留下痕迹，思考慢慢生长。</span
-            ><span>OPENPAPER <ArrowUpRight :size="12" /></span>
-          </footer>
         </template>
         <section v-else aria-label="已删除的项目">
           <Button

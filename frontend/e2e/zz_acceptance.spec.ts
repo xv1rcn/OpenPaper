@@ -9,11 +9,17 @@ test("unsaved paper drafts survive dismissed close and reload prompts", async ({
   await page.getByRole("button", { name: /编辑：Exploring/ }).click();
   const notes = page.getByLabel("阅读笔记");
   await notes.fill("Unsaved acceptance draft");
-  page.once("dialog", (d) => d.dismiss());
   await page.getByRole("button", { name: "取消", exact: true }).click();
+  await page
+    .getByRole("alertdialog")
+    .getByRole("button", { name: "取消", exact: true })
+    .click();
   await expect(notes).toHaveValue("Unsaved acceptance draft");
-  page.once("dialog", (d) => d.dismiss());
   await page.keyboard.press("Escape");
+  await page
+    .getByRole("alertdialog")
+    .getByRole("button", { name: "取消", exact: true })
+    .click();
   await expect(notes).toHaveValue("Unsaved acceptance draft");
   const prompt = page.waitForEvent("dialog");
   const reloading = page.reload({ timeout: 2000 }).catch(() => null);
@@ -22,8 +28,8 @@ test("unsaved paper drafts survive dismissed close and reload prompts", async ({
   await dialog.dismiss();
   await reloading;
   await expect(notes).toHaveValue("Unsaved acceptance draft");
-  page.once("dialog", (d) => d.accept());
   await page.getByRole("button", { name: "取消", exact: true }).click();
+  await page.getByRole("alertdialog").getByRole("button").last().click();
   await expect(page.getByRole("dialog")).toHaveCount(0);
 });
 
@@ -61,9 +67,9 @@ test("cached reading exports real PDF/PPTX content and restores deleted cache", 
     expect(text).toContain("Module A");
     expect(text.replace(/\s+/g, "")).toContain("LONG-CONTENT-END");
   }
-  page.once("dialog", (d) => d.accept());
   await page.getByRole("button", { name: "删除速读" }).click();
-  await expect(page.getByText("原文已就绪")).toBeVisible();
+  await page.getByRole("alertdialog").getByRole("button").last().click();
+  await expect(page.getByText("尚未生成速读")).toBeVisible();
   await page.getByRole("link", { name: "书库", exact: true }).click();
   await page.getByRole("button", { name: /回收站/ }).click();
   const row = page.locator(".recycle-row").filter({ hasText: "Exploring" });
@@ -101,7 +107,7 @@ test("generation errors remain actionable and retries use saved credentials only
   await expect(page.getByText("Synthetic model failure")).toBeVisible();
   for (let i = 0; i < 2; i++) {
     await page.getByRole("button", { name: "生成速读", exact: true }).click();
-    await page.getByRole("button", { name: "开始生成（会调用模型）" }).click();
+    await page.getByRole("button", { name: "开始生成" }).click();
     await expect(page.getByText(/Synthetic service unavailable/)).toBeVisible();
   }
   expect(attempts).toBe(2);
@@ -122,14 +128,17 @@ test("appearance conflict keeps drafts and discarding leaves the saved theme int
         })
       : route.continue(),
   );
-  await page.getByRole("button", { name: "保存外观" }).click();
+  await page.getByRole("button", { name: "保存" }).click();
   await expect(page.getByRole("alert")).toContainText("外观已在其他页面修改");
   await expect(page.getByLabel("页面背景")).toHaveValue("#1d2520");
-  page.once("dialog", (d) => d.dismiss());
   await page.getByRole("button", { name: "关闭设置" }).click();
+  await page
+    .getByRole("alertdialog")
+    .getByRole("button", { name: "取消", exact: true })
+    .click();
   await expect(page.getByLabel("页面背景")).toHaveValue("#1d2520");
-  page.once("dialog", (d) => d.accept());
   await page.getByRole("button", { name: "关闭设置" }).click();
+  await page.getByRole("alertdialog").getByRole("button").last().click();
   await expect(page.getByRole("dialog")).toHaveCount(0);
   await expect(page.locator("html")).toHaveAttribute("data-theme", "light");
 });

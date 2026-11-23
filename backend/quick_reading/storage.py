@@ -123,7 +123,7 @@ def get_speedread_cache(file_key: str, workspace_root: str, quick_reading_cache_
     except Exception as exc:
         return _Result(500, {"ok": False, "error": f"读取速读缓存失败: {exc}"})
     if not speed_read:
-        return _Result(404, {"ok": False, "error": "速读缓存不存在"})
+        return _Result(404, {"ok": False, "code": "speedread_not_generated", "error": "尚未生成速读"})
     return _Result(200, {"ok": True, "speed_read": speed_read})
 
 

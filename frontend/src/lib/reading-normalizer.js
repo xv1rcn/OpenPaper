@@ -1,4 +1,4 @@
-    const MISSING_TEXT = '论文中未明确说明';
+    const MISSING_TEXT = '';
 
     function escapeHtml(value = '') {
         return String(value)

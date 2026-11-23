@@ -8,16 +8,16 @@ test("Vue settings persist without returning or storing credentials, and conflic
   await page.goto("/app/");
   await page.getByRole("button", { name: "设置", exact: true }).click();
   await expect(
-    page.getByRole("button", { name: "保存配置", exact: true }),
+    page.getByRole("button", { name: "保存", exact: true }),
   ).toBeEnabled();
   await page
     .getByLabel("API 地址", { exact: true })
     .fill("https://example.com/v1");
   await page.getByLabel("API Key", { exact: true }).fill("synthetic-secret");
   await page.getByLabel("模型名称", { exact: true }).fill("test-model");
-  await page.getByRole("button", { name: "保存配置", exact: true }).click();
+  await page.getByRole("button", { name: "保存", exact: true }).click();
   await expect(page.getByLabel("API Key", { exact: true })).toHaveValue("");
-  await expect(page.getByText("已保存密钥 · 留空即可继续使用")).toBeVisible();
+  await expect(page.getByText("已设置")).toBeVisible();
   expect(await page.evaluate(() => JSON.stringify(localStorage))).not.toContain(
     "synthetic-secret",
   );
@@ -35,12 +35,12 @@ test("Vue settings persist without returning or storing credentials, and conflic
       contentType: "application/json",
       body: JSON.stringify({
         ok: true,
-        preview: "Synthetic connection verified",
+        preview: "连接成功",
       }),
     });
   });
-  await page.getByRole("button", { name: "测试接口（会调用模型）" }).click();
-  await expect(page.getByText("Synthetic connection verified")).toBeVisible();
+  await page.getByRole("button", { name: "测试连接" }).click();
+  await expect(page.getByText("连接成功")).toBeVisible();
   await page.getByLabel("模型名称", { exact: true }).fill("draft-model");
   await page.route("**/api/settings", async (route) => {
     if (route.request().method() === "POST")
@@ -51,7 +51,7 @@ test("Vue settings persist without returning or storing credentials, and conflic
       });
     else await route.continue();
   });
-  await page.getByRole("button", { name: "保存配置", exact: true }).click();
+  await page.getByRole("button", { name: "保存", exact: true }).click();
   await expect(page.getByRole("alert")).toContainText("配置已被修改");
   await expect(page.getByLabel("模型名称", { exact: true })).toHaveValue(
     "draft-model",
@@ -61,14 +61,17 @@ test("Vue settings persist without returning or storing credentials, and conflic
     fullPage: true,
   });
   await page.unroute("**/api/settings");
-  page.once("dialog", (dialog) => dialog.accept());
-  await page.getByRole("button", { name: "重新加载", exact: true }).click();
+  await page.getByRole("button", { name: "放弃修改", exact: true }).click();
+  await page.getByRole("alertdialog").getByRole("button").last().click();
   await expect(page.getByLabel("模型名称", { exact: true })).toHaveValue(
     "test-model",
   );
-  page.once("dialog", (dialog) => dialog.accept());
   await page.getByRole("button", { name: "清空配置", exact: true }).click();
-  await expect(page.getByText("尚未保存密钥")).toBeVisible();
+  await page.getByRole("alertdialog").getByRole("button").last().click();
+  await expect(page.getByLabel("API Key", { exact: true })).toHaveAttribute(
+    "placeholder",
+    "输入服务商提供的密钥",
+  );
 });
 
 test("legacy import removes browser key only after verified backend save", async ({
@@ -102,8 +105,8 @@ test("legacy import removes browser key only after verified backend save", async
       });
     else await route.continue();
   });
-  page.once("dialog", (dialog) => dialog.accept());
   await page.getByRole("button", { name: "导入旧配置" }).click();
+  await page.getByRole("alertdialog").getByRole("button").last().click();
   await expect(page.getByRole("alert")).toContainText(
     "Synthetic vault unavailable",
   );
@@ -114,8 +117,8 @@ test("legacy import removes browser key only after verified backend save", async
     ),
   ).toBe(true);
   await page.unroute("**/api/settings");
-  page.once("dialog", (dialog) => dialog.accept());
   await page.getByRole("button", { name: "导入旧配置" }).click();
+  await page.getByRole("alertdialog").getByRole("button").last().click();
   await expect(page.getByLabel("模型名称", { exact: true })).toHaveValue(
     "legacy-model",
   );
@@ -125,9 +128,12 @@ test("legacy import removes browser key only after verified backend save", async
     ),
   ).toBeNull();
   await expect(page.getByLabel("API Key", { exact: true })).toHaveValue("");
-  page.once("dialog", (dialog) => dialog.accept());
   await page.getByRole("button", { name: "清空配置", exact: true }).click();
-  await expect(page.getByText("尚未保存密钥")).toBeVisible();
+  await page.getByRole("alertdialog").getByRole("button").last().click();
+  await expect(page.getByLabel("API Key", { exact: true })).toHaveAttribute(
+    "placeholder",
+    "输入服务商提供的密钥",
+  );
 });
 
 test("imports a real PDF, deduplicates retry and rejects corrupt files", async ({

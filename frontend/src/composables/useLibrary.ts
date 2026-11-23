@@ -1,3 +1,4 @@
+import { useTransientMessage } from "./useTransientMessage";
 import { ref, computed } from "vue";
 import { api, normalizePaper } from "@/lib/api";
 import { filterPapers } from "@/lib/library";
@@ -9,6 +10,7 @@ export function useLibrary() {
     busy = ref(false),
     error = ref(""),
     notice = ref("");
+  useTransientMessage(notice);
   const venue = ref(""),
     selectedTags = ref<string[]>([]),
     tagMode = ref<"any" | "all">("any");
@@ -59,6 +61,10 @@ export function useLibrary() {
       await action();
       notice.value = success;
       await refresh();
+      if (error.value) {
+        notice.value = "";
+        error.value = "修改已保存，但列表刷新失败。请重试刷新。";
+      }
       return true;
     } catch (e) {
       error.value = e instanceof Error ? e.message : "操作失败，请重试";
@@ -68,6 +74,7 @@ export function useLibrary() {
     }
   }
   function navigate(next: Collection, nextTag = "") {
+    notice.value = "";
     collection.value = next;
     tag.value = nextTag;
     query.value = "";

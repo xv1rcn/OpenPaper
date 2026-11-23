@@ -1,16 +1,38 @@
 <script setup lang="ts">
-import { ref } from "vue";
+import { ref, computed, onUnmounted } from "vue";
 import { Plus, FileUp, X } from "@lucide/vue";
 import Button from "./ui/button/Button.vue";
 const props = defineProps<{ disabled: boolean }>();
 const emit = defineEmits<{ complete: []; busy: [value: boolean] }>();
 const input = ref<HTMLInputElement | null>(null),
   uploading = ref(false),
-  results = ref<{ name: string; ok: boolean; message: string }[]>([]),
+  results = ref<
+    { name: string; ok: boolean; warning?: boolean; message: string }[]
+  >([]),
   current = ref("");
+const hasIssues = computed(() => results.value.some((r) => !r.ok || r.warning));
+const resultSummary = computed(() => {
+  const failed = results.value.filter((r) => !r.ok).length;
+  return failed
+    ? `${results.value.length - failed} 篇已处理，${failed} 篇未导入`
+    : `${results.value.length} 篇已处理`;
+});
+let dismissTimer: ReturnType<typeof setTimeout> | undefined;
+onUnmounted(() => clearTimeout(dismissTimer));
+function pauseDismiss() {
+  clearTimeout(dismissTimer);
+}
+function resumeDismiss() {
+  clearTimeout(dismissTimer);
+  if (!uploading.value && !hasIssues.value)
+    dismissTimer = setTimeout(() => {
+      results.value = [];
+    }, 5000);
+}
 async function upload(event: Event) {
   const files = [...((event.target as HTMLInputElement).files || [])];
   if (!files.length || uploading.value || props.disabled) return;
+  clearTimeout(dismissTimer);
   uploading.value = true;
   emit("busy", true);
   results.value = [];
@@ -38,8 +60,8 @@ async function upload(event: Event) {
         results.value.push({
           name: file.name,
           ok: true,
-          message:
-            data.warning || (data.duplicate ? "已存在，未重复导入" : "已导入"),
+          warning: !!data.warning,
+          message: data.warning || (data.duplicate ? "已在书库中" : "已导入"),
         });
       } catch (e) {
         results.value.push({
@@ -55,6 +77,7 @@ async function upload(event: Event) {
     current.value = "";
     emit("busy", false);
     emit("complete");
+    resumeDismiss();
     if (input.value) input.value.value = "";
   }
 }
@@ -81,10 +104,13 @@ async function upload(event: Event) {
       class="import-results"
       aria-label="导入结果"
       aria-live="polite"
+      @mouseenter="pauseDismiss"
+      @mouseleave="resumeDismiss"
+      @focusin="pauseDismiss"
+      @focusout="resumeDismiss"
     >
       <header>
-        <strong>导入结果</strong
-        ><button
+        <strong>{{ uploading ? "正在导入" : resultSummary }}</strong><button
           v-if="!uploading"
           aria-label="关闭导入结果"
           @click="results = []"
@@ -96,11 +122,13 @@ async function upload(event: Event) {
       <p
         v-for="(result, index) in results"
         :key="index"
-        :class="{ 'import-error': !result.ok }"
+        :class="{
+          'import-error': !result.ok,
+          'import-warning': result.warning,
+        }"
       >
         <span>{{ result.name }}</span><small>{{ result.message }}</small>
       </p>
-      <footer>原文件保持不变 · 单个 PDF 最大 50 MB</footer>
     </section>
   </div>
 </template>

@@ -1,4 +1,7 @@
 <script setup lang="ts">
+import { useTransientMessage } from "@/composables/useTransientMessage";
+import { confirmAction } from "@/lib/confirmation";
+import Feedback from "@/components/Feedback.vue";
 import { ref, computed, nextTick } from "vue";
 import Button from "./ui/button/Button.vue";
 import { api, request } from "@/lib/api";
@@ -31,6 +34,7 @@ const includeSummary = ref(false),
   message = ref(""),
   logs = ref<string[]>([]),
   logSearch = ref("");
+useTransientMessage(message);
 async function run(action: () => Promise<void>) {
   busy.value = true;
   error.value = "";
@@ -38,7 +42,7 @@ async function run(action: () => Promise<void>) {
   try {
     await action();
   } catch (e) {
-    error.value = String(e);
+    error.value = e instanceof Error ? e.message : String(e);
   } finally {
     busy.value = false;
   }
@@ -63,7 +67,7 @@ async function markdown() {
         if (speed_read?.status === "success") {
           const data = normalizeReading(speed_read);
           parts.push(
-            "### 省流总结",
+            "### 速读概要",
             String(data.one_sentence),
             "",
             ...(Array.isArray(data.quick_takeaways)
@@ -93,8 +97,13 @@ async function metadata() {
     );
   });
 }
-function removeTag(tag: string) {
-  if (confirm(`删除标签“${tag}”？论文不会删除，可从回收站恢复标签。`))
+async function removeTag(tag: string) {
+  if (
+    await confirmAction(
+      `删除标签“${tag}”？论文不会删除，可从回收站恢复标签。`,
+      "删除标签",
+    )
+  )
     run(async () => {
       await api.deleteTag(tag);
       emit("changed");
@@ -113,22 +122,18 @@ function refreshLogs() {
 </script>
 <template>
   <section class="library-tools">
-    <h2>导出与管理</h2>
-    <p class="field-help">
-      当前筛选 {{ filtered.length }} 篇；整个书库
-      {{ papers.length }} 篇。元数据导出保留全部原始字段。
-    </p>
     <div class="tools-row">
       <label
         ><input v-model="includeSummary" type="checkbox" />Markdown
-        包含已生成的省流总结</label
-      ><Button :disabled="busy" @click="markdown">导出当前筛选 Markdown</Button
+        包含已生成的速读概要</label
+      ><Button :disabled="busy" @click="markdown"
+        >导出 Markdown（{{ filtered.length }} 篇）</Button
       ><Button variant="outline" :disabled="busy" @click="metadata"
-        >导出元数据 JSON</Button
+        >导出全库 JSON（{{ papers.length }} 篇）</Button
       >
     </div>
-    <p v-if="error" role="alert" class="inline-error">{{ error }}</p>
-    <p v-if="message" role="status">{{ message }}</p>
+    <Feedback :message="error" />
+    <Feedback :message="message" kind="success" />
     <h3>标签管理</h3>
     <div class="tag-management">
       <div v-for="tag in tags" :key="tag">
