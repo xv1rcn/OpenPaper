@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { viewState } from "@/lib/view-state";
 import { onMounted, onUnmounted, ref, watch } from "vue";
 import {
   getDocument,
@@ -45,7 +46,7 @@ function scale() {
   ready = true;
   emit("page", page);
   try {
-    localStorage.setItem(props.storageKey + "-zoom", zoom.value);
+    viewState.setItem(props.storageKey + "-zoom", zoom.value);
   } catch {}
 }
 function search(previous = false, again = false) {
@@ -70,7 +71,7 @@ watch(
 );
 onMounted(async () => {
   try {
-    const saved = localStorage.getItem(props.storageKey + "-zoom");
+    const saved = viewState.getItem(props.storageKey + "-zoom");
     if (
       saved &&
       [

@@ -111,7 +111,7 @@ npm run test:e2e
 
 `/` 自动跳转 `/app/`；旧阅读链接保留 `file_key`，旧统计链接打开 Vue 统计视图。没有构建产物时返回 503。旧模板已移除；参考历史 Git 版本。
 
-设置中的“外观”通过 `/api/preferences` 保存到配置目录的 `preferences.json`，与密钥存储分离；使用修订号避免旧页面覆盖新配置。主题在重开页面时应用。浏览器分组顺序、卡片/列表、阅读布局仍保存在 localStorage。
+设置中的“外观”通过 `/api/preferences` 保存到配置目录的 `preferences.json`，与密钥存储分离；使用修订号避免旧页面覆盖新配置。主题在重开页面时应用。分组顺序、卡片/列表、阅读页码、缩放和对照布局通过 `/api/view-state` 原子保存到 `view-state.json`。每次只修改指定项，避免覆盖其他文档状态；同一项采用最后写入值。旧 localStorage 仅补齐后端不存在的项，旧记录保留。
 
 速读使用已有 Python 缓存与生成流程；原文已使用本地打包的 PDF.js，支持文本选择、搜索、缩放与页码恢复；Tauri/WebView 实机验证仍待后续完成。
 
@@ -142,4 +142,4 @@ Vite 将 cmaps、standard_fonts、wasm 和许可证复制到 dist/pdfjs，开发
 
 `scripts/packaging/build_backend.py` 将后端及前端静态资源打包为 onedir；`smoke_backend.py` 验证搬移后的独立运行。三平台桌面 CI 同时运行这两个步骤。构建依赖独立放在 `scripts/packaging/requirements.txt`，不增加普通后端的运行依赖。
 
-本地 macOS 已完成 release `.app` 构建、冻结依赖检查与脱离源码目录的后端会话/资源/退出测试。受限执行环境的 FSEvents 测试出现原生崩溃，因此在 `OPENPAPER_POLLING_WATCHER=1` 下完成 72 项后端测试。完整原生窗口启动与交互尚待桌面环境验收，不能用后端冒烟测试替代。
+本地 macOS 已完成 release `.app` 构建、冻结依赖检查与脱离源码目录的后端会话/资源/退出测试。受限执行环境的 FSEvents 测试出现原生崩溃，因此在 `OPENPAPER_POLLING_WATCHER=1` 下完成 72 项后端测试。后续已观察到原生 release 窗口正常加载；完整交互仍待验收，不能用后端冒烟测试替代。

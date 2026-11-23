@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { viewState, viewStateError } from "@/lib/view-state";
 import { computed, nextTick, onMounted, onUnmounted, ref } from "vue";
 import {
   Search,
@@ -76,23 +77,23 @@ async function closeSettings() {
 }
 const grouped = ref(false);
 try {
-  grouped.value = localStorage.getItem("openpaper-grouped") === "true";
+  grouped.value = viewState.getItem("openpaper-grouped") === "true";
 } catch {}
 function toggleGrouping() {
   grouped.value = !grouped.value;
   try {
-    localStorage.setItem("openpaper-grouped", String(grouped.value));
+    viewState.setItem("openpaper-grouped", String(grouped.value));
   } catch {}
 }
 const layout = ref<"grid" | "list">("grid");
 try {
-  if (localStorage.getItem("openpaper-library-layout") === "list")
+  if (viewState.getItem("openpaper-library-layout") === "list")
     layout.value = "list";
 } catch {}
 function setLayout(value: "grid" | "list") {
   layout.value = value;
   try {
-    localStorage.setItem("openpaper-library-layout", value);
+    viewState.setItem("openpaper-library-layout", value);
   } catch {}
 }
 const selected = ref<Paper | null>(null),
@@ -160,6 +161,7 @@ onMounted(() => {
 onUnmounted(() => window.removeEventListener("keydown", keyboard));
 </script>
 <template>
+  <div v-if="viewStateError" role="alert" class="state-save-error">{{ viewStateError }}</div>
   <ReaderWorkspace v-if="routeKey" :file-key="routeKey" />
   <div v-else class="app-shell">
     <LibrarySidebar

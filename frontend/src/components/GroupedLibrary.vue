@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { viewState } from "@/lib/view-state";
 import { computed, ref } from "vue";
 import PaperCard from "./PaperCard.vue";
 import type { Paper } from "@/lib/types";
@@ -13,8 +14,8 @@ const order = ref<string[]>([]),
   dragged = ref<string | null>(null);
 try {
   const raw = JSON.parse(
-    localStorage.getItem("openpaper-group-order") ||
-      localStorage.getItem("papers-visualizer-group-order-v1") ||
+    viewState.getItem("openpaper-group-order") ||
+      viewState.getItem("papers-visualizer-group-order-v1") ||
       "[]",
   );
   if (Array.isArray(raw))
@@ -40,7 +41,7 @@ const groups = computed(() => {
 });
 function persist() {
   try {
-    localStorage.setItem("openpaper-group-order", JSON.stringify(order.value));
+    viewState.setItem("openpaper-group-order", JSON.stringify(order.value));
   } catch {}
 }
 function move(tag: string, direction: number) {

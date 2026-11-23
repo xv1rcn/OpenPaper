@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { viewState } from "@/lib/view-state";
 import NoteText from "./NoteText.vue";
 import {
   ref,
@@ -62,7 +63,7 @@ const figureItems = computed(
 const storageKey = "openpaper-reader-" + props.fileKey;
 function saveLayout() {
   try {
-    localStorage.setItem(
+    viewState.setItem(
       storageKey,
       JSON.stringify({
         page: page.value,
@@ -150,7 +151,7 @@ async function exportAs(format: "pdf" | "pptx") {
 }
 onMounted(async () => {
   try {
-    const saved = JSON.parse(localStorage.getItem(storageKey) || "{}");
+    const saved = JSON.parse(viewState.getItem(storageKey) || "{}");
     if (Number.isInteger(saved.page) && saved.page > 0) page.value = saved.page;
     if (saved.width >= 25 && saved.width <= 70) width.value = saved.width;
     if (typeof saved.showPdf === "boolean") showPdf.value = saved.showPdf;

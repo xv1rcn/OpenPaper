@@ -1,4 +1,4 @@
-import { test, expect } from "@playwright/test";
+import { test, expect } from "./fixtures";
 test("PDF.js renders, searches, navigates and restores zoom without remote assets", async ({
   page,
 }) => {

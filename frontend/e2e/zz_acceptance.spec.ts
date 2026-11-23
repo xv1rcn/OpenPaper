@@ -1,4 +1,4 @@
-import { test, expect } from "@playwright/test";
+import { test, expect } from "./fixtures";
 import { execFileSync } from "node:child_process";
 const python = process.env.OPENPAPER_TEST_PYTHON || "../.venv/bin/python";
 

@@ -1922,3 +1922,5 @@ body,
     padding-top: 12px;
   }
 }
+
+.state-save-error { position: fixed; bottom: 12px; left: 50%; transform: translateX(-50%); z-index: 200; max-width: 90vw; padding: 10px 16px; background: #fff1ef; color: #8a251c; border: 1px solid #cf6b60; border-radius: 8px; }

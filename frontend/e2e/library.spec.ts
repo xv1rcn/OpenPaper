@@ -1,4 +1,4 @@
-import { test, expect } from "@playwright/test";
+import { test, expect } from "./fixtures";
 test("library edits persist, deletion restores and filters remain usable", async ({
   page,
 }) => {

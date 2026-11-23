@@ -40,6 +40,7 @@ from backend.library.locking import library_lock
 from backend.library.importer import import_pdf, PDFImportError, MAX_PDF_BYTES
 from backend.settings.store import SettingsStore, SettingsError, ConflictError
 from backend.settings.preferences import PreferencesStore
+from backend.settings.view_state import ViewStateStore
 
 HTTP_PORT = 8000
 SPEEDREAD_MAX_IMAGE_PAGES = 5
@@ -217,6 +218,13 @@ class PaperRequestHandler(SimpleHTTPRequestHandler):
             self.send_header("Content-Length", "0")
             self.end_headers()
             return
+        if parsed.path == "/api/view-state":
+            if not self._settings_access(): return
+            try:
+                self._send_json(200, {"ok": True, "values": self.server.view_state.read()})
+            except SettingsError as exc:
+                self._send_json(400, {"ok": False, "error": str(exc)})
+            return
         if parsed.path == "/api/preferences":
             if not self._settings_access(): return
             try:
@@ -290,6 +298,21 @@ class PaperRequestHandler(SimpleHTTPRequestHandler):
                 self._send_json(400, {"ok": False, "error": str(exc)})
             except OSError:
                 self._send_json(500, {"ok": False, "error": "无法写入论文库，请检查目录权限或磁盘空间"})
+            return
+        if parsed.path == "/api/view-state":
+            if not self._settings_access(write=True): return
+            try:
+                length = int(self.headers.get("Content-Length", "0"))
+                if not 0 < length <= 32768 or self.headers.get("Transfer-Encoding"):
+                    raise SettingsError("阅读状态请求大小无效")
+                payload = json.loads(self.rfile.read(length))
+                if not isinstance(payload, dict): raise SettingsError("阅读状态请求格式无效")
+                value = self.server.view_state.save(payload.get("key"), payload.get("value"), payload.get("onlyMissing") is True)
+                self._send_json(200, {"ok": True, "value": value})
+            except (ValueError, SettingsError):
+                self._send_json(400, {"ok": False, "error": "阅读状态无效，未保存"})
+            except OSError:
+                self._send_json(500, {"ok": False, "error": "阅读状态保存失败，请检查磁盘权限"})
             return
         if parsed.path == "/api/preferences":
             if not self._settings_access(write=True): return
@@ -635,6 +658,7 @@ def create_server(paths, port=HTTP_PORT, settings=None, desktop_token=None):
     server.runtime = paths
     server.settings = settings if settings is not None else SettingsStore()
     server.preferences = PreferencesStore(server.settings.path.parent)
+    server.view_state = ViewStateStore(server.settings.path.parent)
     return server
 
 
