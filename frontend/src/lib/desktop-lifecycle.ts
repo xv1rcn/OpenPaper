@@ -3,6 +3,7 @@ import { confirmAction } from "./confirmation";
 
 const drafts = new Set<Readonly<Ref<boolean>>>();
 export const backendStopped = ref(false);
+export const recoveryHosts = ref(0);
 export let approvedNavigation = false;
 let requesting = false;
 let installed = false;

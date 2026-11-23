@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import DesktopRecovery from "./DesktopRecovery.vue";
 import { confirmAction } from "@/lib/confirmation";
 import Feedback from "@/components/Feedback.vue";
 import { ref, watch, computed } from "vue";
@@ -138,7 +139,7 @@ function save() {
         <DialogTitle class="dialog-title">论文信息</DialogTitle
         ><DialogDescription class="sr-only"
           >编辑论文信息和笔记。</DialogDescription
-        >
+        ><DesktopRecovery inline />
         <button
           class="dialog-close"
           aria-label="关闭"

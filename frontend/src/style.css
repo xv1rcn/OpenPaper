@@ -2112,3 +2112,12 @@ body,
   box-shadow: 0 4px 20px #00000014;
   font-size: 14px;
 }
+
+.desktop-recovery-inline {
+  position: static;
+  transform: none;
+  max-width: 100%;
+  margin: 12px 0;
+  box-shadow: none;
+  flex-wrap: wrap;
+}

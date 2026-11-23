@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import DesktopRecovery from "./DesktopRecovery.vue";
 import { confirmAction } from "@/lib/confirmation";
 import Feedback from "@/components/Feedback.vue";
 import { computed, onMounted, ref, watch } from "vue";
@@ -191,7 +192,7 @@ onMounted(load);
         >
         <DialogDescription class="sr-only"
           >应用外观与速读配置。</DialogDescription
-        >
+        ><DesktopRecovery inline />
         <button
           class="dialog-close"
           aria-label="关闭设置"
