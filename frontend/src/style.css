@@ -1389,10 +1389,8 @@ body,
   list-style: disc;
 }
 .reading-record {
-  background: #f1f4ec;
-  border-radius: 7px;
-  padding: 15px;
-  margin: 12px 0;
+  background: transparent;
+  margin: 16px 0;
 }
 .reading-record dt {
   font-size: 12px;
@@ -1404,7 +1402,7 @@ body,
   margin: 4px 0 12px;
 }
 .reading-record .reading-text {
-  font-size: 13px;
+  font-size: 14px;
 }
 .reading-figure {
   margin: 18px 0;
@@ -2054,9 +2052,9 @@ body,
 }
 .reading-record {
   background: transparent;
-  padding: 0 0 0 14px;
+  padding: 0;
   border-radius: 0;
-  border-left: 1px solid var(--line);
+  border: 0;
 }
 [data-theme="dark"] .reading-record {
   background: transparent;
@@ -2092,4 +2090,85 @@ body,
 .state-save-error {
   color: var(--feedback-error);
   background: var(--feedback-error-bg);
+}
+
+/* Article hierarchy without nested data cards. */
+.reading-record-list {
+  list-style: none;
+  padding-left: 0;
+  margin: 16px 0;
+}
+.reading-record-list > li + li {
+  border-top: 1px solid var(--line);
+  margin-top: 20px;
+  padding-top: 4px;
+}
+.reading-record-title,
+.technical-module h3,
+.reading-supplement h3 {
+  font-size: 16px;
+  font-weight: 600;
+  line-height: 1.5;
+  margin: 0 0 10px;
+  overflow-wrap: anywhere;
+}
+.technical-module {
+  margin-top: 24px;
+}
+.technical-module + .technical-module {
+  border-top: 1px solid var(--line);
+  padding-top: 24px;
+}
+.technical-reading .reading-text {
+  margin: 0 0 10px;
+}
+.reading-related-terms,
+.reading-term-basis {
+  font-size: 12px;
+  line-height: 1.7;
+  color: var(--muted-text);
+}
+.reading-references {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+}
+.reading-references .page-reference {
+  margin: 0;
+  background: transparent;
+  padding: 2px 0;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.reading-glossary,
+.reading-supplement {
+  margin-top: 24px;
+  border-top: 1px solid var(--line);
+  padding-top: 16px;
+}
+.reading-glossary summary {
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 600;
+}
+.reading-glossary summary span {
+  margin-left: 6px;
+  color: var(--muted-text);
+  font-weight: 400;
+}
+.reading-term {
+  margin-top: 16px;
+}
+.reading-term dt {
+  font-size: 14px;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+.reading-term dd {
+  margin: 6px 0 0;
+}
+.reading-term-basis {
+  font-weight: 400;
+  margin-left: 10px;
 }

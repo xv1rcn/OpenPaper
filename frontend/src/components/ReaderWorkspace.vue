@@ -14,6 +14,7 @@ import { ArrowLeft, RefreshCw, Download, Settings2, Trash2 } from "@lucide/vue";
 import Button from "./ui/button/Button.vue";
 import SettingsPanel from "./SettingsPanel.vue";
 import StructuredRead from "./StructuredRead.vue";
+import TechnicalRead from "./TechnicalRead.vue";
 import { api, request, normalizePaper, pdfUrl } from "@/lib/api";
 import {
   loadReading,
@@ -398,7 +399,11 @@ onUnmounted(() => {
                     查看第 {{ figure.page }} 页
                   </button>
                 </article></template
-              ><StructuredRead
+              ><TechnicalRead
+                v-else-if="key === 'technical_detail_read'"
+                :value="normalized[key]"
+                @page="jump"
+              /><StructuredRead
                 v-else
                 :value="normalized[key]"
                 @page="jump"

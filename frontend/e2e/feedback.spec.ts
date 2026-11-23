@@ -63,3 +63,18 @@ test("partial save warnings remain visible and do not claim full success", async
   await page.waitForTimeout(4500);
   await expect(page.locator(".feedback-warning")).toBeVisible();
 });
+
+test("technical modules read as prose and source links still navigate the PDF", async ({
+  page,
+}) => {
+  await page.goto("/app/?file_key=fixture-2.pdf");
+  const section = page.locator("#technical_detail_read");
+  await section.scrollIntoViewIfNeeded();
+  await expect(
+    section.getByRole("heading", { name: "Module A", exact: true }),
+  ).toBeVisible();
+  await expect(section).toContainText("Controlled fixture");
+  await expect(section.locator(".reading-record")).toHaveCount(0);
+  await section.getByRole("button", { name: "第 2 页", exact: true }).click();
+  await expect(page.getByLabel("PDF 页码", { exact: true })).toHaveValue("2");
+});

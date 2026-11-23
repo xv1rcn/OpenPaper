@@ -77,7 +77,51 @@ const entries = computed(() =>
     ? Object.entries(props.value).filter(([, item]) => hasReadingContent(item))
     : [],
 );
-const known = computed(() => entries.value.filter(([key]) => key in labels));
+const heading = computed(() =>
+  entries.value.find(
+    ([key, value]) =>
+      ["name", "title", "term"].includes(key) && typeof value === "string",
+  ),
+);
+const fieldOrder = [
+  "summary",
+  "role",
+  "description",
+  "task",
+  "purpose",
+  "mechanism",
+  "technical_explanation",
+  "explanation",
+  "meaning",
+  "result",
+  "modules",
+  "compared_methods",
+  "datasets",
+  "metrics",
+  "main_results",
+];
+const orderedFields = [
+  ...fieldOrder,
+  ...Object.keys(labels).filter(
+    (key) => !fieldOrder.includes(key) && key !== "page_refs",
+  ),
+  "page_refs",
+];
+const known = computed(() =>
+  orderedFields
+    .filter((key) => key !== heading.value?.[0])
+    .flatMap((key) => entries.value.filter(([entry]) => entry === key)),
+);
+const recordList = computed(
+  () =>
+    Array.isArray(props.value) &&
+    props.value.some(
+      (item) => item && typeof item === "object" && !Array.isArray(item),
+    ),
+);
+const items = computed(() =>
+  Array.isArray(props.value) ? props.value.filter(hasReadingContent) : [],
+);
 const extra = computed(() =>
   Object.fromEntries(entries.value.filter(([key]) => !(key in labels))),
 );
@@ -110,8 +154,12 @@ const text = computed(() => {
 </script>
 <template>
   <template v-if="!hasReadingContent(value)" />
-  <ul v-else-if="Array.isArray(value)" class="reading-list">
-    <li v-for="(item, index) in value" :key="index">
+  <ul
+    v-else-if="Array.isArray(value)"
+    class="reading-list"
+    :class="{ 'reading-record-list': recordList }"
+  >
+    <li v-for="(item, index) in items" :key="index">
       <StructuredRead
         :value="item"
         :depth="(depth || 0) + 1"
@@ -119,34 +167,37 @@ const text = computed(() => {
       />
     </li>
   </ul>
-  <dl
+  <div
     v-else-if="typeof value === 'object' && (depth || 0) < 12"
     class="reading-record"
   >
-    <template v-for="[key, item] in known" :key="key"
-      ><dt>{{ labels[key] }}</dt>
-      <dd>
-        <template v-if="key === 'page_refs' && Array.isArray(item)"
-          ><button
-            v-for="page in item"
-            :key="String(page)"
-            class="page-reference"
-            @click="$emit('page', Number(page))"
-          >
-            第 {{ page }} 页
-          </button></template
-        ><StructuredRead
-          v-else
-          :value="item"
-          :field="key"
-          :depth="(depth || 0) + 1"
-          @page="$emit('page', $event)"
-        /></dd
-    ></template>
+    <h4 v-if="heading" class="reading-record-title">{{ heading[1] }}</h4>
+    <dl>
+      <template v-for="[key, item] in known" :key="key"
+        ><dt>{{ labels[key] }}</dt>
+        <dd>
+          <template v-if="key === 'page_refs' && Array.isArray(item)"
+            ><button
+              v-for="page in item"
+              :key="String(page)"
+              class="page-reference"
+              @click="$emit('page', Number(page))"
+            >
+              第 {{ page }} 页
+            </button></template
+          ><StructuredRead
+            v-else
+            :value="item"
+            :field="key"
+            :depth="(depth || 0) + 1"
+            @page="$emit('page', $event)"
+          /></dd
+      ></template>
+    </dl>
     <details v-if="Object.keys(extra).length" class="extra-reading-fields">
       <summary>其他结果字段</summary>
       <pre>{{ JSON.stringify(extra, null, 2) }}</pre>
     </details>
-  </dl>
+  </div>
   <p v-else class="reading-text">{{ text }}</p>
 </template>
