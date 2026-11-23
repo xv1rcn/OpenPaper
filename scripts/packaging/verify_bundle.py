@@ -15,6 +15,8 @@ def smoke(directory):
         raise RuntimeError(f'Expected one bundled helper in {directory}; found {len(matches)}')
     subprocess.run([sys.executable, str(ROOT / 'scripts/packaging/smoke_backend.py'),
                     str(matches[0].parent)], check=True, timeout=180)
+    subprocess.run([sys.executable, str(ROOT / 'scripts/packaging/acceptance_backend.py'),
+                    str(matches[0].parent)], check=True, timeout=240)
 
 
 def main():

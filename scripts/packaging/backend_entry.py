@@ -8,7 +8,24 @@ if __name__ == '__main__':
     for stream in (sys.stdout, sys.stderr):
         if stream is not None:
             stream.reconfigure(encoding='utf-8', errors='replace')
-    if '--self-check' in sys.argv:
+    if '--self-check-vault' in sys.argv:
+        from uuid import uuid4
+        from backend.settings.store import NativeVault
+        vault = NativeVault()
+        vault.SERVICE = 'org.openpaper.acceptance'
+        account = uuid4().hex
+        value = 'synthetic-' + uuid4().hex
+        written = False
+        try:
+            vault.set(account, value)
+            written = True
+            assert vault.get(account) == value
+        finally:
+            if written:
+                vault.delete(account)
+        assert vault.get(account) is None
+        print('Native credential vault write/read/delete passed (isolated synthetic entry)')
+    elif '--self-check' in sys.argv:
         import io
         import json
         import pymupdf
