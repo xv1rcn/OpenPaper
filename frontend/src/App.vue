@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { confirmAction } from "@/lib/confirmation";
+import DesktopRecovery from "./components/DesktopRecovery.vue";
 import ConfirmDialog from "./components/ConfirmDialog.vue";
 import Feedback from "@/components/Feedback.vue";
 import { viewState, viewStateError } from "@/lib/view-state";
@@ -167,6 +168,7 @@ onUnmounted(() => window.removeEventListener("keydown", keyboard));
 </script>
 <template>
   <ConfirmDialog />
+  <DesktopRecovery />
   <div v-if="viewStateError" role="alert" class="state-save-error">
     {{ viewStateError }}
   </div>

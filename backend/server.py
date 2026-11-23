@@ -689,8 +689,11 @@ def main(argv=None):
             sys.stdin.buffer.read()
             stopped.set()
         threading.Thread(target=watch_parent, daemon=True).start()
-    # Restricted hosts may forbid native filesystem event streams.
-    observer = PollingObserver() if os.environ.get("OPENPAPER_POLLING_WATCHER") == "1" else Observer()
+    # FSEvents may fail asynchronously and segfault during shutdown when its
+    # native stream cannot start. Use the portable observer by default on macOS;
+    # OPENPAPER_POLLING_WATCHER=0 is an explicit diagnostic opt-in to native events.
+    polling = os.environ.get("OPENPAPER_POLLING_WATCHER", "1" if sys.platform == "darwin" else "0") == "1"
+    observer = PollingObserver(timeout=2) if polling else Observer()
     serving = False
     watching = False
     old_signals = {}

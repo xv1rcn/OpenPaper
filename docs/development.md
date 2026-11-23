@@ -2,7 +2,7 @@
 
 ## 当前状态
 
-目前已实现 Vue 书库/阅读页面与系统凭据库。Tauri 开发宿主与桌面会话已实现；安装包尚未实现。不要将本地开发 HTTP 服务暴露到外网。
+已实现 Vue 书库/阅读页面、系统凭据库、Tauri 桌面会话及内置 Python 的三平台测试包。包级测试与原生交互验收分别记录，见 [桌面验收](desktop-acceptance.md)。不要将本地开发 HTTP 服务暴露到外网。
 
 ## 本地环境
 
@@ -36,7 +36,7 @@ python3 -m venv .venv
 {"event":"ready","api_version":1,"host":"127.0.0.1","port":12345}
 ```
 
-该事件表示 bootstrap、论文扫描、HTTP 服务和目录监控均已启动。stdout 也有普通日志，未来桌面宿主按 JSON 行的 event 字段识别就绪事件。这里不输出长期凭据；临时会话认证在 M4 实施。
+该事件表示 bootstrap、论文扫描、HTTP 服务和目录监控均已启动。stdout 也有普通日志，桌面宿主按 JSON 行的 event 字段识别就绪事件。这里不输出长期凭据；桌面会话认证已实现。
 
 服务收到 SIGINT/SIGTERM 后停止监控、取消待执行扫描并释放监听端口。正在执行的业务请求尚无统一取消协议，任务退出策略列入后续里程碑。
 
@@ -53,7 +53,7 @@ python3 -m venv .venv
 
 显式 bootstrap 才会检查旧布局。旧速读目录采用复制且不覆盖现有结果；保留原件，并写迁移标记避免下次启动重新导入已删除的结果。内嵌速读成功保存后才移除 metadata 内旧字段，修改前保留备份。
 
-浏览器 API Key 本轮不读取、不复制、不迁移。生产级配置和凭据迁移安排在 M2。
+迁往独立桌面目录的复制步骤、备份和回退见 [旧书库迁移](library-migration.md)。不复制设置 JSON 中的凭据引用或浏览器密钥；桌面设置中重新填写模型配置。
 
 ## 配置服务开发
 
@@ -71,7 +71,7 @@ POST 同一路径提交 `{provider, revision, apiKey?}`，设置 `Content-Type: 
 首页与独立阅读页已接入此服务。刷新页面后，在“设置 → 速读”显式导入旧浏览器配置；未点击导入前旧密钥仍在浏览器。
 生成、连接测试与模型列表请求仅接收 `apiConfig: {useSaved: true}`，并要求与设置写入相同的自定义请求头。
 清空配置发送 `{revision, reset: true}`；预算字段允许 0 表示自动配置。
-运行前端检查：`node --test tests/settings-client.test.cjs`。
+运行前端检查：`npm test --prefix frontend`。
 
 ## Vue 论文库
 
@@ -98,7 +98,7 @@ npm run test:e2e
 
 ## Vue 设置与导入
 
-新书库侧栏“设置”直接调用既有 `/api/settings`，无需转到旧首页。只有点击“测试接口”才调用模型；选择/保存配置不会进行付费模型调用。
+新书库侧栏“设置”直接调用既有 `/api/settings`，无需转到旧首页。点击“测试接口”或生成速读会调用模型；选择/保存配置不会进行付费模型调用。
 旧浏览器配置导入必须在原来的 origin 中操作；开发预览 5173 与实际应用 8001 的浏览器存储互相隔离。
 
 `POST /api/import-pdf` 使用原始 PDF 请求体，要求 `Content-Type: application/pdf`、`X-OpenPaper-Request: 1`，以及经过百分号编码的 `X-File-Name`。上限 50 MB；当前不接受加密 PDF。
@@ -113,7 +113,7 @@ npm run test:e2e
 
 设置中的“外观”通过 `/api/preferences` 保存到配置目录的 `preferences.json`，与密钥存储分离；使用修订号避免旧页面覆盖新配置。主题在重开页面时应用。分组顺序、卡片/列表、阅读页码、缩放和对照布局通过 `/api/view-state` 原子保存到 `view-state.json`。每次只修改指定项，避免覆盖其他文档状态；同一项采用最后写入值。旧 localStorage 仅补齐后端不存在的项，旧记录保留。
 
-速读使用已有 Python 缓存与生成流程；原文已使用本地打包的 PDF.js，支持文本选择、搜索、缩放与页码恢复；Tauri/WebView 实机验证仍待后续完成。
+速读使用已有 Python 缓存与生成流程；原文已使用本地打包的 PDF.js，支持文本选择、搜索、缩放与页码恢复；macOS 原生单页显示已验证；多页交互与跨平台实机范围见桌面验收记录。
 
 ## PDF.js 阅读组件
 
@@ -142,4 +142,6 @@ Vite 将 cmaps、standard_fonts、wasm 和许可证复制到 dist/pdfjs，开发
 
 `scripts/packaging/build_backend.py` 将后端及前端静态资源打包为 onedir；`smoke_backend.py` 验证搬移后的独立运行。三平台桌面 CI 同时运行这两个步骤。构建依赖独立放在 `scripts/packaging/requirements.txt`，不增加普通后端的运行依赖。
 
-本地 macOS 已完成 release `.app` 构建、冻结依赖检查与脱离源码目录的后端会话/资源/退出测试。受限执行环境的 FSEvents 测试出现原生崩溃，因此在 `OPENPAPER_POLLING_WATCHER=1` 下完成 72 项后端测试。后续已观察到原生 release 窗口正常加载；完整交互仍待验收，不能用后端冒烟测试替代。
+本地 macOS 已完成 release `.app` 构建、冻结依赖检查及包内导入、配置、重启和同版本替换测试；真实凭据调用与单页原生阅读已有验收记录。不能用后端集成测试替代窗口交互测试。
+
+macOS 默认使用两秒间隔的轮询监听：本机最小 watchdog FSEvents 程序在事件流启动失败后，停止/回收阶段触发原生段错误，与应用 HTTP 和模型逻辑无关。`OPENPAPER_POLLING_WATCHER=0` 可显式启用原生模式诊断；Windows/Linux 默认原生监听，`=1` 可启用轮询。轮询有额外目录扫描开销与检测延迟；应用内导入和修改仍直接刷新索引。

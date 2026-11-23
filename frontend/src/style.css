@@ -2093,3 +2093,22 @@ body,
   color: var(--feedback-error);
   background: var(--feedback-error-bg);
 }
+
+.desktop-recovery {
+  pointer-events: auto;
+  position: fixed;
+  z-index: 290;
+  bottom: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  max-width: calc(100vw - 32px);
+  padding: 12px 16px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--background);
+  box-shadow: 0 4px 20px #00000014;
+  font-size: 14px;
+}

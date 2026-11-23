@@ -44,6 +44,9 @@ jobs:
         run: python scripts/packaging/build_backend.py
       - name: Test relocated backend without source or venv
         run: python scripts/packaging/smoke_backend.py desktop/packaged/openpaper-backend
+      - name: Test desktop lifecycle origin restrictions
+        run: cargo test --locked
+        working-directory: desktop
       - name: Build release application and installer
         run: npx --yes --package=@tauri-apps/cli@2.11.4 tauri build --config tauri.bundle.conf.json --bundles ${{ matrix.bundle }} -- --locked
         working-directory: desktop
