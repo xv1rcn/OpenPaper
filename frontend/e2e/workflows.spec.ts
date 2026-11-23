@@ -167,7 +167,7 @@ test("imports a real PDF, deduplicates retry and rejects corrupt files", async (
 
   await page.getByLabel("选择 PDF 文件").setInputFiles(upload);
   await expect(page.getByRole("region", { name: "导入结果" })).toContainText(
-    "未重复导入",
+    "已在书库中",
   );
   await expect(page.locator(".paper-card")).toHaveCount(4);
   await page.getByLabel("选择 PDF 文件").setInputFiles({

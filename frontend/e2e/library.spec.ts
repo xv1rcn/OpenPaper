@@ -49,7 +49,7 @@ test("empty search, mobile layout and keyboard access", async ({ page }) => {
   await expect(page.getByRole("textbox", { name: "搜索论文" })).toBeFocused();
   await page.keyboard.type("no-such-paper");
   await expect(page.getByText("没有匹配的论文")).toBeVisible();
-  await page.getByRole("button", { name: "查看全部论文" }).click();
+  await page.getByRole("button", { name: "清除筛选" }).click();
   await page.setViewportSize({ width: 390, height: 844 });
   await expect(page.locator(".paper-card")).toHaveCount(3);
   expect(

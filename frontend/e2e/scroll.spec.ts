@@ -84,7 +84,7 @@ for (const size of [
     ).toBe(true);
     await page.getByRole("button", { name: "重新生成速读" }).click();
     await expect(
-      page.getByRole("heading", { name: "速读生成选项" }),
+      page.getByRole("heading", { name: "生成速读" }),
     ).toBeVisible();
     expect(
       await page.evaluate(
