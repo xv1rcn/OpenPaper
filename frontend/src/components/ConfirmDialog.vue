@@ -7,7 +7,6 @@ import {
   AlertDialogTitle,
   AlertDialogDescription,
   AlertDialogCancel,
-  AlertDialogAction,
 } from "reka-ui";
 import { confirmation, finishConfirmation } from "@/lib/confirmation";
 </script>
@@ -35,10 +34,10 @@ import { confirmation, finishConfirmation } from "@/lib/confirmation";
             @click="finishConfirmation(false)"
             >取消</AlertDialogCancel
           >
-          <AlertDialogAction
+          <button type="button"
             class="ui-button button-primary"
             @click="finishConfirmation(true)"
-            >{{ confirmation?.action }}</AlertDialogAction
+            >{{ confirmation?.action }}</button
           >
         </div>
       </AlertDialogContent>
