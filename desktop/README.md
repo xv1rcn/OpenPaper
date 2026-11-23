@@ -73,3 +73,19 @@ cargo tauri build --config tauri.bundle.conf.json --bundles app
 受限环境无法使用系统文件事件时，可设置 `OPENPAPER_POLLING_WATCHER=1` 改用轮询监控；默认仍使用原生监控。轮询会增加目录扫描开销。
 
 原生验收：已通过原生应用控制观察到 release OpenPaper.app 的书库窗口正常加载。此前启动测试可能被手动关闭，原因未确认；不作为启动故障结论。完整导入/阅读/退出交互与真实凭据库读写仍待验收。
+
+## CI 测试包下载
+
+Desktop build 工作流在每次 push / PR（也支持手动运行）中分别构建：
+
+| 平台 | 产物 | 包级验证 |
+| --- | --- | --- |
+| Windows runner 架构 | NSIS `.exe` 安装程序 | 临时目录静默安装，验证安装后的后端，再执行卸载 |
+| Ubuntu 24.04 runner 架构 | `.deb` | 解包后验证所含后端；尚非系统级安装验收 |
+| macOS runner 架构 | `.app` 的 `.tar.gz` | 验证应用内后端；压缩保留符号链接和执行权限 |
+
+在 GitHub Actions 的 Desktop build 运行页面底部下载对应 `OpenPaper-平台-架构-提交` artifact，保留 14 天；其中包含安装包和 `SHA256SUMS.txt`。压缩包是 GitHub Artifact 外层 ZIP，macOS 还需解开其中的 tar.gz。产物用于测试，不会自动发布 GitHub Release，也尚未配置发行签名/公证。
+
+构建机架构决定 Python 运行时与应用架构；目前不提供所有架构组合。Linux 以 Ubuntu 24.04 为构建基线，尚不保证较旧发行版兼容。Windows 缺失 WebView2 时安装过程可能需要联网下载；Linux 仍需可用的 Secret Service 才能保存密钥。
+
+CI 的包级验证覆盖后端依赖、会话、资源和生命周期；原生窗口交互、真实凭据库、Linux 系统安装卸载及升级保留数据仍需实机验收。
