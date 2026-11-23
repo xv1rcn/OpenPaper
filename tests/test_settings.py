@@ -130,6 +130,29 @@ class SettingsTests(unittest.TestCase):
                     operation()
                 self.assertNotIn('synthetic-secret', str(caught.exception))
 
+    def test_os_status_survives_save_without_exception_text(self):
+        error_type = type('Error', (Exception,), {'__module__': 'keyring.backends.macOS.api'})
+        low = error_type(100001, 'synthetic-secret')
+        high = RuntimeError('wrapper synthetic-secret')
+        high.__cause__ = low
+        vault = NativeVault()
+        store = SettingsStore(self.root, vault)
+        with patch.object(vault, '_backend', side_effect=high):
+            with self.assertRaises(SettingsError) as caught:
+                store.save(self.provider, '0', 'synthetic-secret')
+        self.assertIn('100001', str(caught.exception))
+        self.assertIn('无法写入系统凭据库', str(caught.exception))
+        self.assertNotIn('synthetic-secret', str(caught.exception))
+        self.assertFalse(store.path.exists())
+
+    def test_disk_failure_reports_phase_without_path_or_secret(self):
+        with patch.object(self.store, '_write', side_effect=OSError('private/path synthetic-secret')):
+            with self.assertRaises(SettingsError) as caught:
+                self.save()
+        self.assertIn('写入配置文件失败', str(caught.exception))
+        self.assertNotIn('private/path', str(caught.exception))
+        self.assertNotIn('synthetic-secret', str(caught.exception))
+
 
 class SettingsHTTPTests(unittest.TestCase):
     def setUp(self):

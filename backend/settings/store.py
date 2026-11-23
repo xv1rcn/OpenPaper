@@ -21,6 +21,26 @@ class ConflictError(SettingsError):
     pass
 
 
+class VaultError(SettingsError):
+    """Safe diagnostic assembled from operation and numeric OS status only."""
+    def __init__(self, operation, cause):
+        code = None
+        current = cause
+        for _ in range(8):
+            if current is None:
+                break
+            if (type(current).__module__ == 'keyring.backends.macOS.api'
+                    and current.args and type(current.args[0]) is int):
+                code = current.args[0]
+                break
+            if isinstance(current, OSError) and type(getattr(current, 'winerror', None)) is int:
+                code = current.winerror
+                break
+            current = current.__cause__
+        suffix = f'（系统错误码 {code}）' if code is not None else ''
+        super().__init__(operation + suffix)
+
+
 class NativeVault:
     SERVICE = "org.openpaper.desktop"
 
@@ -39,20 +59,20 @@ class NativeVault:
     def get(self, account):
         try:
             return self._backend().get_password(self.SERVICE, account)
-        except Exception:
-            raise SettingsError("无法读取系统凭据库") from None
+        except Exception as exc:
+            raise VaultError("无法读取系统凭据库", exc) from None
 
     def set(self, account, secret):
         try:
             self._backend().set_password(self.SERVICE, account, secret)
-        except Exception:
-            raise SettingsError("无法写入系统凭据库") from None
+        except Exception as exc:
+            raise VaultError("无法写入系统凭据库", exc) from None
 
     def delete(self, account):
         try:
             self._backend().delete_password(self.SERVICE, account)
-        except Exception:
-            raise SettingsError("无法清理系统凭据库条目") from None
+        except Exception as exc:
+            raise VaultError("无法清理系统凭据库条目", exc) from None
 
 
 def default_config_root():
@@ -150,22 +170,26 @@ class SettingsStore:
                 raise SettingsError("更换 API 地址时必须重新提供密钥")
             ref = old["credentialRef"]
             fresh = uuid4().hex if api_key is not None else None
+            phase = "写入系统凭据库"
             try:
                 if fresh:
                     self.vault.set(fresh, api_key)
+                    phase = "读回校验密钥"
                     if self.vault.get(fresh) != api_key:
                         raise SettingsError("凭据读回校验失败")
                     ref = fresh
                 data = {"schemaVersion": 1, "revision": uuid4().hex,
                         "provider": provider, "credentialRef": ref}
+                phase = "写入配置文件"
                 self._write(data)
-            except Exception:
+            except Exception as exc:
                 if fresh:
                     try:
                         self.vault.delete(fresh)
                     except Exception:
                         pass
-                raise SettingsError("配置保存失败；旧配置仍然有效") from None
+                detail = str(exc) if isinstance(exc, VaultError) else phase + "失败"
+                raise SettingsError(detail + "；本次修改未保存，旧配置仍然有效") from None
             result = self._public(data)
             if fresh and old["credentialRef"]:
                 try:
