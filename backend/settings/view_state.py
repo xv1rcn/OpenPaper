@@ -1,4 +1,5 @@
 """Non-secret view state; keys never become filesystem paths."""
+from collections import OrderedDict
 import json
 import os
 from pathlib import Path
@@ -35,6 +36,7 @@ class ViewStateStore:
     def __init__(self, root):
         self.path = Path(root) / 'view-state.json'
         self.lock = RLock()
+        self.clients = OrderedDict()
 
     def read(self):
         with self.lock:
@@ -50,14 +52,19 @@ class ViewStateStore:
             except Exception:
                 raise SettingsError('阅读状态文件损坏或版本不受支持，原文件已保留') from None
 
-    def save(self, key, value, only_missing=False):
+    def save(self, key, value, only_missing=False, client=None, sequence=None):
         validate(key, value)
+        if client is not None and (not isinstance(client, str) or not 1 <= len(client) <= 64
+                                   or type(sequence) is not int or not 0 < sequence <= 9007199254740991):
+            raise SettingsError('阅读状态更新序号无效')
         with self.lock:
             values = self.read()
+            if client is not None:
+                previous = self.clients.get(client, {}).get(key, 0)
+                if sequence <= previous:
+                    return values.get(key, value)
             if only_missing and key in values:
                 return values[key]
-            if values.get(key) == value:
-                return value
             if key not in values and len(values) >= 20000:
                 raise SettingsError('阅读状态数量已达上限')
             values[key] = value
@@ -72,4 +79,9 @@ class ViewStateStore:
             finally:
                 if os.path.exists(name):
                     os.unlink(name)
+            if client is not None:
+                self.clients.setdefault(client, {})[key] = sequence
+                self.clients.move_to_end(client)
+                if len(self.clients) > 128:
+                    self.clients.popitem(last=False)
             return value

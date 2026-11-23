@@ -24,6 +24,9 @@ class ViewStateTests(unittest.TestCase):
             with patch('backend.settings.view_state.os.replace', side_effect=OSError('disk')):
                 with self.assertRaises(OSError): store.save('openpaper-grouped', 'false')
             self.assertEqual(store.read()['openpaper-grouped'], 'true')
+            store.save('openpaper-library-layout', 'grid', client='page-a', sequence=2)
+            store.save('openpaper-library-layout', 'list', client='page-a', sequence=1)
+            self.assertEqual(store.read()['openpaper-library-layout'], 'grid')
             raw = '{"schemaVersion":99,"values":{}}'
             store.path.write_text(raw)
             with self.assertRaises(SettingsError): store.save('openpaper-grouped', 'false')

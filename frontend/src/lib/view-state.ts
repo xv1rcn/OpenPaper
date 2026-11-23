@@ -2,7 +2,8 @@ import { ref } from "vue";
 export const viewStateError = ref("");
 let values: Record<string, string> = {};
 let loaded = false;
-let queue = Promise.resolve();
+const client = crypto.randomUUID();
+let sequence = 0;
 async function send(body?: unknown) {
   const response = await fetch("/api/view-state", body === undefined ? { cache: "no-store", signal: AbortSignal.timeout(10000) } : {
     method: "POST", keepalive: true, signal: AbortSignal.timeout(10000),
@@ -41,10 +42,10 @@ export const viewState = {
   setItem(key: string, value: string) {
     if (!loaded || values[key] === value) return;
     values[key] = value;
-    // Serialize writes to keep page events in order; never silently swallow errors.
-    queue = queue.then(async () => {
-      try { await send({ key, value }); }
-      catch { viewStateError.value = "阅读状态未能保存，请检查连接并重新打开页面。"; }
+    // Dispatch immediately so navigation cannot discard an unsent queued write.
+    // The server rejects out-of-order writes from this page instance.
+    void send({ key, value, client, sequence: ++sequence }).catch(() => {
+      viewStateError.value = "阅读状态未能保存，请检查连接并重新打开页面。";
     });
   },
 };

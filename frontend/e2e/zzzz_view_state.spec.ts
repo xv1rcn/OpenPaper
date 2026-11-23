@@ -15,7 +15,7 @@ test("reader and library state survive a fresh browser context", async ({ browse
     const page = await context.newPage();
     await page.goto("/app/?file_key=fixture-2.pdf");
     await expect(page.locator(".pdfViewer canvas").first()).toBeVisible();
-    await expect(page.locator('.pdf-controls input[type="number"]')).toHaveValue("2");
+    await expect(page.getByLabel("PDF 页码")).toHaveValue("2");
     await expect(page.locator(".pdf-controls select")).toHaveValue("1.25");
     await page.locator(".pdf-controls select").selectOption("1.5");
     await expect.poll(async () => (await (await request.get("/api/view-state")).json()).values["openpaper-reader-fixture-2.pdf-zoom"]).toBe("1.5");

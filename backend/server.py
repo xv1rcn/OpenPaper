@@ -307,7 +307,7 @@ class PaperRequestHandler(SimpleHTTPRequestHandler):
                     raise SettingsError("阅读状态请求大小无效")
                 payload = json.loads(self.rfile.read(length))
                 if not isinstance(payload, dict): raise SettingsError("阅读状态请求格式无效")
-                value = self.server.view_state.save(payload.get("key"), payload.get("value"), payload.get("onlyMissing") is True)
+                value = self.server.view_state.save(payload.get("key"), payload.get("value"), payload.get("onlyMissing") is True, payload.get("client"), payload.get("sequence"))
                 self._send_json(200, {"ok": True, "value": value})
             except (ValueError, SettingsError):
                 self._send_json(400, {"ok": False, "error": "阅读状态无效，未保存"})
