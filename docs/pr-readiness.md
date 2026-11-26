@@ -16,7 +16,7 @@
 
 ## 合入前仍需证据
 
-- 最新代码 7d21b1f 的三平台桌面打包 CI 仍在运行；前端和后端已通过。
+- 最新代码 7d21b1f 的前端、后端及三平台桌面打包 CI 全部通过（2026-11-26 复核）。自动检查已收齐，下面的原生验收仍需执行。
 - macOS 原生故障注入：启动失败页面、运行时终止后端、保留草稿、取消/确认退出、取消/确认重启。当前界面控制连接超时，未实测此轮宿主改动。
 - Windows/Linux 原生窗口、系统凭据库、导入阅读、下载、文件定位及退出。CI 无桌面凭据库不能替代这些测试。
 - 更广泛的历史缓存和超长图表导出专项检查。
@@ -38,7 +38,11 @@
 
 - 前端（通过）：https://github.com/xv1rcn/OpenPaper/actions/runs/45099701351
 - 后端六组矩阵（通过）：https://github.com/xv1rcn/OpenPaper/actions/runs/45099701177
-- 三平台桌面包（运行中，需查看最终结果）：https://github.com/xv1rcn/OpenPaper/actions/runs/45099701271
+- 三平台桌面包（全部通过）：https://github.com/xv1rcn/OpenPaper/actions/runs/45099701271
 - 本地最新 macOS 应用包已重建，默认环境下包内冒烟和导入/保存/重启/同版本替换验收通过。
 
 此前两个旧提交的桌面构建已取消，以释放资源给最新提交；取消不是成功。首次新增 E2E 的宿主信号模拟导致 Chromium 网络错误页，已改为保留文档的 204 响应模拟，最终 26 项通过。此模拟测试不是 Tauri 原生实机验证。
+
+## 2026-11-26 原生验收尝试
+
+应用控制连接再次超时；备用 System Events 返回 -10827，执行环境禁止查询进程。未启动故障注入、未终止个人应用或后端，个人论文库与模型配置未改动。可复现的隔离测试步骤见 [native-acceptance.md](native-acceptance.md)。PR 标题与描述草稿见 [pull-request-draft.md](pull-request-draft.md)，尚未发布 PR。
